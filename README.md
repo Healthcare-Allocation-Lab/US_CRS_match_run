@@ -3,7 +3,7 @@
 Perform simulated match runs under a counterfacutal ![US-CRS](https://jamanetwork.com/journals/jama/fullarticle/2814884) based allocation policy
 
 
-## Acuity circle implementation for US-S
+## Acuity circle implementation for US-CRS
 
 
 status 1: US-CSR ≥49
