@@ -26,8 +26,8 @@ This project performs a counterfactual match run analysis comparing the current 
 
 ### Analysis Pipeline
 1. **US-CRS Score Generation** (`code/US_CRS_data_prep.Rmd`): Calculate time-varying US-CRS scores for candidates
-2. **Match Run Processing** (`code/match_run_data_prep.Rmd`): Process SRTR match run data, visualize current allocation patterns
-3. **Counterfactual Analysis**: Re-run match runs using US-CRS scores instead of therapy-based status
+2. **Match Run Processing** (`code/match_run_data_prep.Rmd`): Process SRTR match run data, map US-CRS scores to candidates, visualize current allocation patterns
+3. **Counterfactual Analysis**: Re-run match runs using US-CRS scores instead of therapy-based status following `uscrs_allocation.md` specifications
 
 ### Key Data Fields (from PTR Heart File Format)
 - `PX_ID`: Patient identifier
@@ -61,6 +61,11 @@ heart_only_match_run <- match_run %>%
 
 ### Key Analysis Functions
 ```r
+# Map US-CRS scores for candidates at match run date
+us_crs_mapper <- function(patient_id, match_date){
+  # Returns list(us_crs_score, prob_surv_6wk) for tie-breaking
+}
+
 # Visualize match run for a specific donor
 visualize_mr <- function(donor_id){
   heart_only_match_run %>%
@@ -69,6 +74,11 @@ visualize_mr <- function(donor_id){
     geom_point() + 
     labs(x = "sequence number", y = "distance (NM)")
 }
+
+# Blood type compatibility for allocation
+is_blood_compatible <- function(donor_abo, candidate_abo){
+  # Returns "primary", "secondary", or "incompatible"
+}
 ```
 
 ## File Organization
@@ -76,6 +86,15 @@ visualize_mr <- function(donor_id){
 ### Core Analysis (`code/`)
 - Primary analysis scripts for US-CRS score calculation and match run processing
 - **CRITICAL: DO NOT attempt to read SAS7BDAT files during code development** - these are large SRTR data files that should only be loaded when actually running analyses
+
+### Allocation Framework (`uscrs_allocation.md`)
+- Complete specification of all 68 US-CRS based allocation classifications
+- Maps Table 6-7 heart allocation sequence to US-CRS status definitions
+- Defines tie-breaking rules using raw probability scores (prob_surv_6wk)
+- Blood type compatibility and distance category definitions
+
+### Mapping Tables (`mapping_tables/`)
+- `us_crs_mapping_2019_2021.csv`: Maps raw survival probabilities to 50-point US-CRS scale
 
 ### Templates (`templates/`)
 - Generic SRTR analysis templates for common survival analysis patterns
@@ -92,6 +111,8 @@ visualize_mr <- function(donor_id){
 - The project handles complex SRTR data structures including multiple registrations, concurrent listings, and time-varying covariates
 - Uses discrete-time survival analysis framework for US-CRS score application
 - Requires careful handling of transplant center identifiers and geographic distances
+- Parallel processing with `furrr` package for efficient US-CRS mapping across 550k+ observations
+- Time-varying US-CRS scores must align with match run submission dates for accurate counterfactual analysis
 
 ## Common SRTR Analysis Patterns
 
