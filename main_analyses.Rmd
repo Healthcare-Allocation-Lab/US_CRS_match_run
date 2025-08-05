@@ -1,0 +1,70 @@
+---
+title: "SRTR Data Analysis Template"
+author: "Your Name"
+date: "`r Sys.Date()`"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+# Load essential libraries
+library(tidyverse)
+library(haven)  # For reading SRTR SAS files
+library(lubridate)  # For date handling
+
+```
+
+```{r}
+# Load data from data prep file
+load("data.RData")
+```
+
+# Examples of common analyses
+```{r}
+# Competing risk regression
+# Status is a factor variable defined by all possible competing events (death, transplant, etc) with 0 being the value for censoring
+library(cmprsk)
+crr(Surv(survival_time,status) ~ cov1_ + cov2 + cov3, data = data)
+
+```
+
+```{r}
+# Cox Proportional Hazards Model
+# Status is an indicator variable defined by 1 event, with all others being censored
+library(survival)
+coxph(Surv(survival_time, status) ~ cov1 + cov2 + cov3, data = data)
+
+```
+
+```{r}
+# Cox Mixed Effects Model
+# Status is an indicator variable defined by 1 event, with all others being censored
+library(coxme)
+coxme(Surv(survival_time, status) ~ cov1 + cov2 + cov3 + (1|cov4), data = data)
+
+# Use this method to include random effects (e.g. center)
+
+```
+
+
+```{r}
+# Restricted mean survival time, same set up as coxph
+# Specify time horizon over which to calculate the rmst using tau
+library(survRM2)
+rmst2(time=data$survival_time, status=time$status, arm=data$cov1, tau=365)
+```
+
+```{r}
+# Kaplan Meier Survival estimates
+library(survival)
+survfit(Surv(survival_time, status)~ as.factor(type), data=data)
+
+#Estimate km survival prob across diff groups
+
+```
+
+```{r}
+# Cumulative Incidence Functions
+library(tidycmprsk)
+cuminc(Surv(time = survival_time, event = as.factor(status)) ~ cov1, data = data)
+
+```
