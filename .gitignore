@@ -1,0 +1,8 @@
+*
+
+!.gitignore
+!*.md
+!*.rmd
+!mapping_tables/*
+!references/*
+!templates/*

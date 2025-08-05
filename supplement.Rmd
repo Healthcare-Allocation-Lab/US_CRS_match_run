@@ -1,2 +1,0 @@
-The Supplement Rmd should include all code used to produce supplemental figures and tables
-Example code for these types of tables and fiures is available in the main analyses/figures rmds

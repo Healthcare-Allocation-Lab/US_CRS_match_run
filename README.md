@@ -1,36 +1,35 @@
-# SRTR-Project-Template
+# US-CRS match run analysis
 
-This repository outlines the proper structure of a repository for an SRTR organ allocation project. It contains R scripts, data mapping tables (if relevant), and other supporting files for analyzing transplant data using the SRTR dataset.
+Perform simulated match runs under a counterfacutal ![US-CRS](https://jamanetwork.com/journals/jama/fullarticle/2814884) based allocation policy
 
-## Repository Contents
 
-### data_prep_post_tx.Rmd:
+## Acuity circle implementation for US-S
 
-Example data prep cases for post-transplant analyses
-Includes data cleaning, filtering, and the development of any new variables
-This file is required for any project analzying post-transplant outcomes
 
-### data_prep_waitlist.Rmd:
+status 1: US-CSR ≥49
+status 2: US-CRS 40-49
+status 3: US-CRS 30-39
+status 4: 20-29
+status 5: 10-19
+status 6: 0-9
 
-Example data prep cases for waitlist analyses.
-Includes data cleaning, filtering, and the development of any new variables.
-Includes examples of how to deal with waitlist specific issues (multiple listings, multi organ listings)
-This file is required for any project analyzing waitlist outcomes
+![US-CRS distribution by status](references/US_CRS_distribution.png)
 
-### main_analyses.Rmd:
+## Status quo policy
 
-Performs the primary statistical and survival analyses.
-Includes example code for cumulative incidence functions (CIFs), competing risks regressions, Kaplan-Meier survival estimates, cox proportional hazards and mixed effects models.
-This file is required for all projects.
 
-### main_figures.Rmd:
 
-Generates key figures for publication, such as kaplan meier curves, cumulative incidence plots, forest plots, table 1s, and strobe diagrams.
-This file is required for all projects
+## US-CRS based policy
 
-### supplement.Rmd:
 
-Contains supplemental analyses and additional visualizations supporting the main manuscript.
-This file is required for all projects.
+# Required SRTR file
 
-The mapping table csvs should be used and included in the repo of any project analyzing EPTS or KDPI.
+SRTR SAF (version 2025 Q2)
+
+2024 heart match run data 
+
+# Project Instructions
+
+1. Place required SRTR files in the ![data](data) folder
+
+2. Run the ![code](code)
