@@ -3,17 +3,27 @@ data/*.sas7bdat
 data/*.Rdata
 
 # Ignore R project files
-*.Rproj
 .Rproj.user
 .RData
 .Rhistory
 .DS_Store
-goal_datastructure/*
-templates/
 *.html
+
+# renv files
+renv/library/
+renv/local/
+renv/cellar/
+renv/lock/
+renv/python/
+renv/sandbox/
+renv/staging/
+.Rprofile.local
 
 # Ignore large result files
 results/*.pdf
 
 # Ignore screenshots folder
 screenshots/
+
+# Ignore goal_datastructure (temporary)
+goal_datastructure/

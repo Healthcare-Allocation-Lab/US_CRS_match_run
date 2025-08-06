@@ -109,9 +109,114 @@ This document defines all 68 allocation classifications for the counterfactual U
 
 **Note**: Pediatric donors (<18 years) follow a different allocation sequence that prioritizes pediatric candidates first, then adult candidates.
 
-## Pediatric Donor Classifications (104 total)
+## Classifications 69-172 (Pediatric Donors <18 years)
 
-The pediatric donor allocation follows the same US-CRS status definitions but with pediatric candidates receiving priority within each classification before adult candidates.
+| Class | Candidates | Blood Match | Distance | US-CRS Status |
+|-------|------------|-------------|----------|---------------|
+| 69 | Pediatric Status 1A | Primary | 500NM | Status 1A |
+| 70 | Pediatric Status 1A | Secondary | 500NM | Status 1A |
+| 71 | Adult US-CRS Status 1 | Primary | 500NM | ≥49 |
+| 72 | Adult US-CRS Status 1 | Secondary | 500NM | ≥49 |
+| 73 | Pediatric Status 1B | Primary | 250NM | Status 1B |
+| 74 | Pediatric Status 1B | Secondary | 250NM | Status 1B |
+| 75 | Adult US-CRS Status 2 | Primary | 250NM | 40-49 |
+| 76 | Adult US-CRS Status 2 | Secondary | 250NM | 40-49 |
+| 77 | Pediatric Status 1A | Primary | 1000NM | Status 1A |
+| 78 | Pediatric Status 1A | Secondary | 1000NM | Status 1A |
+| 79 | Adult US-CRS Status 1 | Primary | 1000NM | ≥49 |
+| 80 | Adult US-CRS Status 1 | Secondary | 1000NM | ≥49 |
+| 81 | Pediatric Status 1B | Primary | 500NM | Status 1B |
+| 82 | Pediatric Status 1B | Secondary | 500NM | Status 1B |
+| 83 | Adult US-CRS Status 2 | Primary | 500NM | 40-49 |
+| 84 | Adult US-CRS Status 2 | Secondary | 500NM | 40-49 |
+| 85 | Pediatric Status 2 | Primary | 250NM | Status 2 |
+| 86 | Pediatric Status 2 | Secondary | 250NM | Status 2 |
+| 87 | Adult US-CRS Status 3 | Primary | 250NM | 30-39 |
+| 88 | Adult US-CRS Status 3 | Secondary | 250NM | 30-39 |
+| 89 | Pediatric Status 1A | Primary | 1500NM | Status 1A |
+| 90 | Pediatric Status 1A | Secondary | 1500NM | Status 1A |
+| 91 | Adult US-CRS Status 1 | Primary | 1500NM | ≥49 |
+| 92 | Adult US-CRS Status 1 | Secondary | 1500NM | ≥49 |
+| 93 | Pediatric Status 1B | Primary | 1000NM | Status 1B |
+| 94 | Pediatric Status 1B | Secondary | 1000NM | Status 1B |
+| 95 | Adult US-CRS Status 2 | Primary | 1000NM | 40-49 |
+| 96 | Adult US-CRS Status 2 | Secondary | 1000NM | 40-49 |
+| 97 | Pediatric Status 2 | Primary | 500NM | Status 2 |
+| 98 | Pediatric Status 2 | Secondary | 500NM | Status 2 |
+| 99 | Adult US-CRS Status 3 | Primary | 500NM | 30-39 |
+| 100 | Adult US-CRS Status 3 | Secondary | 500NM | 30-39 |
+| 101 | Adult US-CRS Status 4 | Primary | 250NM | 20-29 |
+| 102 | Adult US-CRS Status 4 | Secondary | 250NM | 20-29 |
+| 103 | Pediatric Status 1A | Primary | 2500NM | Status 1A |
+| 104 | Pediatric Status 1A | Secondary | 2500NM | Status 1A |
+| 105 | Adult US-CRS Status 1 | Primary | 2500NM | ≥49 |
+| 106 | Adult US-CRS Status 1 | Secondary | 2500NM | ≥49 |
+| 107 | Pediatric Status 1B | Primary | 1500NM | Status 1B |
+| 108 | Pediatric Status 1B | Secondary | 1500NM | Status 1B |
+| 109 | Adult US-CRS Status 2 | Primary | 1500NM | 40-49 |
+| 110 | Adult US-CRS Status 2 | Secondary | 1500NM | 40-49 |
+| 111 | Pediatric Status 2 | Primary | 1000NM | Status 2 |
+| 112 | Pediatric Status 2 | Secondary | 1000NM | Status 2 |
+| 113 | Adult US-CRS Status 3 | Primary | 1000NM | 30-39 |
+| 114 | Adult US-CRS Status 3 | Secondary | 1000NM | 30-39 |
+| 115 | Adult US-CRS Status 4 | Primary | 500NM | 20-29 |
+| 116 | Adult US-CRS Status 4 | Secondary | 500NM | 20-29 |
+| 117 | Adult US-CRS Status 5 | Primary | 250NM | 10-19 |
+| 118 | Adult US-CRS Status 5 | Secondary | 250NM | 10-19 |
+| 119 | Pediatric Status 1A | Primary | Nation | Status 1A |
+| 120 | Pediatric Status 1A | Secondary | Nation | Status 1A |
+| 121 | Adult US-CRS Status 1 | Primary | Nation | ≥49 |
+| 122 | Adult US-CRS Status 1 | Secondary | Nation | ≥49 |
+| 123 | Pediatric Status 1B | Primary | 2500NM | Status 1B |
+| 124 | Pediatric Status 1B | Secondary | 2500NM | Status 1B |
+| 125 | Adult US-CRS Status 2 | Primary | 2500NM | 40-49 |
+| 126 | Adult US-CRS Status 2 | Secondary | 2500NM | 40-49 |
+| 127 | Pediatric Status 2 | Primary | 1500NM | Status 2 |
+| 128 | Pediatric Status 2 | Secondary | 1500NM | Status 2 |
+| 129 | Adult US-CRS Status 3 | Primary | 1500NM | 30-39 |
+| 130 | Adult US-CRS Status 3 | Secondary | 1500NM | 30-39 |
+| 131 | Adult US-CRS Status 4 | Primary | 1000NM | 20-29 |
+| 132 | Adult US-CRS Status 4 | Secondary | 1000NM | 20-29 |
+| 133 | Adult US-CRS Status 5 | Primary | 500NM | 10-19 |
+| 134 | Adult US-CRS Status 5 | Secondary | 500NM | 10-19 |
+| 135 | Adult US-CRS Status 6 | Primary | 250NM | 0-9 |
+| 136 | Adult US-CRS Status 6 | Secondary | 250NM | 0-9 |
+| 137 | Pediatric Status 1B | Primary | Nation | Status 1B |
+| 138 | Pediatric Status 1B | Secondary | Nation | Status 1B |
+| 139 | Adult US-CRS Status 2 | Primary | Nation | 40-49 |
+| 140 | Adult US-CRS Status 2 | Secondary | Nation | 40-49 |
+| 141 | Pediatric Status 2 | Primary | 2500NM | Status 2 |
+| 142 | Pediatric Status 2 | Secondary | 2500NM | Status 2 |
+| 143 | Adult US-CRS Status 3 | Primary | 2500NM | 30-39 |
+| 144 | Adult US-CRS Status 3 | Secondary | 2500NM | 30-39 |
+| 145 | Adult US-CRS Status 4 | Primary | 1500NM | 20-29 |
+| 146 | Adult US-CRS Status 4 | Secondary | 1500NM | 20-29 |
+| 147 | Adult US-CRS Status 5 | Primary | 1000NM | 10-19 |
+| 148 | Adult US-CRS Status 5 | Secondary | 1000NM | 10-19 |
+| 149 | Adult US-CRS Status 6 | Primary | 500NM | 0-9 |
+| 150 | Adult US-CRS Status 6 | Secondary | 500NM | 0-9 |
+| 151 | Pediatric Status 2 | Primary | Nation | Status 2 |
+| 152 | Pediatric Status 2 | Secondary | Nation | Status 2 |
+| 153 | Adult US-CRS Status 3 | Primary | Nation | 30-39 |
+| 154 | Adult US-CRS Status 3 | Secondary | Nation | 30-39 |
+| 155 | Adult US-CRS Status 4 | Primary | 2500NM | 20-29 |
+| 156 | Adult US-CRS Status 4 | Secondary | 2500NM | 20-29 |
+| 157 | Adult US-CRS Status 5 | Primary | 1500NM | 10-19 |
+| 158 | Adult US-CRS Status 5 | Secondary | 1500NM | 10-19 |
+| 159 | Adult US-CRS Status 6 | Primary | 1000NM | 0-9 |
+| 160 | Adult US-CRS Status 6 | Secondary | 1000NM | 0-9 |
+| 161 | Adult US-CRS Status 4 | Primary | Nation | 20-29 |
+| 162 | Adult US-CRS Status 4 | Secondary | Nation | 20-29 |
+| 163 | Adult US-CRS Status 5 | Primary | 2500NM | 10-19 |
+| 164 | Adult US-CRS Status 5 | Secondary | 2500NM | 10-19 |
+| 165 | Adult US-CRS Status 6 | Primary | 1500NM | 0-9 |
+| 166 | Adult US-CRS Status 6 | Secondary | 1500NM | 0-9 |
+| 167 | Adult US-CRS Status 5 | Primary | Nation | 10-19 |
+| 168 | Adult US-CRS Status 5 | Secondary | Nation | 10-19 |
+| 169 | Adult US-CRS Status 6 | Primary | 2500NM | 0-9 |
+| 170 | Adult US-CRS Status 6 | Secondary | 2500NM | 0-9 |
+| 171 | Adult US-CRS Status 6 | Primary | Nation | 0-9 |
+| 172 | Adult US-CRS Status 6 | Secondary | Nation | 0-9 |
 
 ---
 
