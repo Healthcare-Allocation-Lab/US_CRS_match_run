@@ -11,7 +11,8 @@ This document defines all 68 allocation classifications for the counterfactual U
 - **Status 6**: US-CRS 0-9
 
 ## Distance Categories
-- **500NM**: ≤ 500 nautical miles
+- **250NM**: ≤ 250 nautical miles
+- **500NM**: > 250 and ≤ 500 nautical miles
 - **1000NM**: > 500 and ≤ 1000 nautical miles
 - **1500NM**: > 1000 and ≤ 1500 nautical miles
 - **2500NM**: > 1500 and ≤ 2500 nautical miles
@@ -107,7 +108,24 @@ This document defines all 68 allocation classifications for the counterfactual U
 
 # Table 6-8: Allocation of Hearts from Donors Less Than 18 Years Old
 
-**Note**: Pediatric donors (<18 years) follow a different allocation sequence that prioritizes pediatric candidates first, then adult candidates.
+## Overview
+
+Pediatric donors (<18 years) follow a **pediatric-first allocation sequence** that prioritizes pediatric candidates before adult candidates within each geographic and blood type combination. This preserves pediatric organs for pediatric recipients whenever possible while still allowing adult candidates to receive pediatric donor organs when no suitable pediatric candidates are available.
+
+## Key Differences from Adult Donor Allocation
+
+1. **Pediatric Priority**: Pediatric candidates (Status 1A, 1B, 2) receive priority over equivalent adult US-CRS statuses
+2. **Age-Appropriate Matching**: Pediatric donors preferentially go to pediatric recipients  
+3. **Mixed Classification**: Each distance/blood type combination includes both pediatric and adult candidates
+4. **Status Mapping**: Pediatric Status 1A ≈ Adult US-CRS Status 1, but pediatric candidates get priority
+
+## Pediatric Status Equivalencies
+
+| Pediatric Status | Approximate Adult US-CRS Equivalent | Priority Notes |
+|------------------|-------------------------------------|----------------|
+| **Status 1A** | US-CRS ≥49 (Status 1) | Pediatric 1A ranked before Adult Status 1 |
+| **Status 1B** | US-CRS 30-39 (Status 3) | Pediatric 1B ranked before Adult Status 3 |  
+| **Status 2** | US-CRS 0-9 (Status 6) | Pediatric 2 ranked before Adult Status 6 |
 
 ## Classifications 69-172 (Pediatric Donors <18 years)
 
@@ -220,6 +238,61 @@ This document defines all 68 allocation classifications for the counterfactual U
 
 ---
 
+## Pediatric Allocation Pattern Analysis
+
+### Geographic Progression by Status
+
+**Pediatric Status 1A** (Highest Priority):
+- Classes 69-70: 500NM (Primary/Secondary)
+- Classes 77-78: 1000NM (Primary/Secondary) 
+- Classes 89-90: 1500NM (Primary/Secondary)
+- Classes 103-104: 2500NM (Primary/Secondary)
+- Classes 119-120: Nation (Primary/Secondary)
+
+**Pediatric Status 1B** (High Priority):
+- Classes 73-74: 250NM (Primary/Secondary)
+- Classes 81-82: 500NM (Primary/Secondary)
+- Classes 93-94: 1000NM (Primary/Secondary)
+- Classes 107-108: 1500NM (Primary/Secondary)  
+- Classes 123-124: 2500NM (Primary/Secondary)
+- Classes 137-138: Nation (Primary/Secondary)
+
+**Pediatric Status 2** (Lower Priority):
+- Classes 85-86: 250NM (Primary/Secondary)
+- Classes 97-98: 500NM (Primary/Secondary)
+- Classes 111-112: 1000NM (Primary/Secondary)
+- Classes 127-128: 1500NM (Primary/Secondary)
+- Classes 141-142: 2500NM (Primary/Secondary)
+- Classes 151-152: Nation (Primary/Secondary)
+
+### Adult Candidate Integration
+
+Adult candidates are interspersed throughout the pediatric donor allocation sequence based on their US-CRS scores:
+
+- **Adult Status 1** (US-CRS ≥49): Follows Pediatric Status 1A in each distance circle
+- **Adult Status 2** (US-CRS 40-49): Follows Pediatric Status 1B initially, then by distance
+- **Adult Status 3** (US-CRS 30-39): Follows Pediatric Status 2 initially, then by distance  
+- **Adult Status 4-6** (US-CRS <30): Fill remaining classifications by distance priority
+
+### Implementation Considerations
+
+1. **Pediatric Candidate Identification**: 
+   - Age <18 years OR
+   - Adult candidates with pediatric status codes (2010, 2020, 2030)
+
+2. **US-CRS Score Assignment for Pediatric Candidates**:
+   - Use adult US-CRS model if available
+   - Otherwise, impute based on pediatric status equivalencies
+   - Status 1A → Imputed US-CRS ≥49
+   - Status 1B → Imputed US-CRS ~35 (mid-range of 30-39)
+   - Status 2 → Imputed US-CRS ~5 (mid-range of 0-9)
+
+3. **Tie-Breaking for Pediatric Candidates**:
+   - Primary: Pediatric status level (1A > 1B > 2)
+   - Secondary: US-CRS score (if available)
+   - Tertiary: Waiting time
+   - Final: Raw survival probability (prob_surv_6wk)
+
 ## Tie-Breaking Within Classifications
 
 Within each classification, candidates are ranked by:
@@ -231,7 +304,59 @@ Within each classification, candidates are ranked by:
 
 ## Implementation Notes
 
+### General Implementation
 - Adult candidates with pediatric status codes (2010, 2020, 2030) should be treated as pediatric for allocation purposes
 - US-CRS scores for pediatric candidates without adult US-CRS data should be imputed based on their current status
 - Blood type incompatible matches are excluded from allocation
 - Distance is calculated in nautical miles from donor hospital to candidate transplant center
+
+### Pediatric Donor Specific Implementation
+
+**Donor Age Classification**:
+```r
+donor_age_category <- ifelse(DON_AGE < 18, "pediatric", "adult")
+allocation_table <- ifelse(donor_age_category == "pediatric", "Table_6_8", "Table_6_7")
+```
+
+**Candidate Classification for Pediatric Donors**:
+```r
+candidate_type <- case_when(
+  str_detect(status, "pediatric") ~ "pediatric",
+  PTR_STAT_CD %in% c("2010", "2020", "2030") ~ "pediatric",
+  CAN_AGE_AT_LISTING < 18 ~ "pediatric", 
+  TRUE ~ "adult"
+)
+```
+
+**Priority Ranking Algorithm**:
+1. Filter to blood type compatible candidates
+2. Calculate distance category (250NM, 500NM, 1000NM, 1500NM, 2500NM, Nation)
+3. Assign classification (1-172) based on Table 6-8
+4. Within each classification, rank by:
+   - Pediatric status level (if pediatric candidate)
+   - US-CRS score (higher = better priority)
+   - Raw survival probability (lower = better priority) 
+   - Waiting time (longer = better priority)
+
+**Code Structure**:
+```r
+assign_pediatric_donor_classification <- function(match_data) {
+  match_data %>%
+    filter(DON_AGE < 18) %>%
+    mutate(
+      candidate_type = determine_candidate_type(...),
+      blood_compatibility = is_blood_compatible(DON_ABO, CAN_ABO, "heart"),
+      distance_category = get_distance_category(PTR_DISTANCE),
+      us_crs_status = map_uscrs_status(us_crs_score),
+      allocation_class = assign_class_69_172(...)
+    ) %>%
+    arrange(allocation_class, desc(us_crs_score), desc(prob_surv_6wk))
+}
+```
+
+### Validation Checks
+
+- Verify pediatric candidates receive appropriate priority within classifications
+- Ensure adult candidates are correctly interspersed based on US-CRS equivalencies  
+- Confirm distance circles are applied consistently across pediatric and adult donor allocations
+- Test edge cases: pediatric candidates with adult status codes, adult candidates competing for pediatric donor organs
