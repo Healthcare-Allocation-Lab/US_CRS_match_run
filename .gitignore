@@ -1,10 +1,19 @@
-*
+# Ignore data files (large SRTR datasets)
+data/*.sas7bdat
+data/*.Rdata
 
-!.gitignore
-!*.md
-!*.rmd
-!code/*
-!mapping_tables/*
-!references/*
-!templates/*
+# Ignore R project files
+*.Rproj
 .Rproj.user
+.RData
+.Rhistory
+.DS_Store
+goal_datastructure/*
+templates/
+*.html
+
+# Ignore large result files
+results/*.pdf
+
+# Ignore screenshots folder
+screenshots/
