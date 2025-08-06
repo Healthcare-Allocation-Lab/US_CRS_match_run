@@ -20,30 +20,72 @@ load(here("data", "heart_only_match_run_with_uscrs.Rdata"))
 # Get unique donor IDs for analysis
 donor_ids <- heart_only_match_run_with_uscrs %>% pull(DONOR_ID) %>% unique()
 
+# Get unique match IDs
+match_ids <- heart_only_match_run_with_uscrs %>% pull(MATCH_ID) %>% unique()
+
 print(paste("Loaded", nrow(heart_only_match_run_with_uscrs), "match run records"))
 print(paste("Found", length(donor_ids), "unique donors"))
+print(paste("Found", length(match_ids), "unique match runs"))
+```
+
+# Data Structure Analysis
+
+## Donor-Match Relationship
+```{r donor-match-analysis}
+# Analyze how many match runs each donor appears in
+donor_match_counts <- heart_only_match_run_with_uscrs %>%
+  group_by(DONOR_ID) %>%
+  summarise(
+    n_match_runs = n_distinct(MATCH_ID),
+    n_candidates = n(),
+    .groups = "drop"
+  ) %>%
+  arrange(desc(n_match_runs))
+
+print("Donors with multiple match runs:")
+multi_match_donors <- donor_match_counts %>%
+  filter(n_match_runs > 1) %>%
+  head(10)
+
+print(multi_match_donors)
+
+cat("\nSummary:\n")
+cat("- Donors with 1 match run:", sum(donor_match_counts$n_match_runs == 1), "\n")
+cat("- Donors with >1 match run:", sum(donor_match_counts$n_match_runs > 1), "\n")
+cat("- Max match runs per donor:", max(donor_match_counts$n_match_runs), "\n")
+
+# This demonstrates why match_id is better than donor_id for visualization
 ```
 
 # Visualization Functions
 
 ## Basic match run visualization (by status)
 ```{r visualize-mr}
-# Visualize match run for a specific donor colored by status
-visualize_mr <- function(donor_id, match_data = heart_only_match_run_with_uscrs){
+# Visualize match run for a specific match ID colored by status
+visualize_mr <- function(match_id, match_data = heart_only_match_run_with_uscrs){
   
-  donor_blood_type <- match_data %>%
-    filter(DONOR_ID == donor_id) %>%
-    pull(DON_ABO) %>%
-    unique()
+  # Get match run information
+  match_info <- match_data %>%
+    filter(MATCH_ID == match_id) %>%
+    select(DONOR_ID, DON_ABO, MATCH_SUBMIT_DT) %>%
+    distinct()
+  
+  if(nrow(match_info) == 0) {
+    stop("Match ID not found in dataset")
+  }
+  
+  donor_id <- match_info$DONOR_ID
+  donor_blood_type <- match_info$DON_ABO
+  match_date <- match_info$MATCH_SUBMIT_DT
   
   # Get the actual recipient sequence number as numeric value
   tx_seq_number <- match_data %>%
-    filter(is.na(REC_TX_DT) == FALSE & DONOR_ID == donor_id) %>%
+    filter(is.na(REC_TX_DT) == FALSE & MATCH_ID == match_id) %>%
     pull(PTR_SEQUENCE_NUM)
   
   # Get recipient distance for the rectangle
   recipient_distance <- match_data %>%
-    filter(is.na(REC_TX_DT) == FALSE & DONOR_ID == donor_id) %>%
+    filter(is.na(REC_TX_DT) == FALSE & MATCH_ID == match_id) %>%
     pull(PTR_DISTANCE)
   
   if(length(tx_seq_number) == 0 || is.na(tx_seq_number)) {
@@ -53,13 +95,13 @@ visualize_mr <- function(donor_id, match_data = heart_only_match_run_with_uscrs)
   }
   
   p <- match_data %>%
-    filter(DONOR_ID == donor_id) %>%
+    filter(MATCH_ID == match_id) %>%
     ggplot(aes(x = PTR_SEQUENCE_NUM, y = PTR_DISTANCE, 
                color = status, shape = CAN_ABO)) +
     geom_point() + 
     labs(x = "Sequence Number", y = "Distance (NM)", 
          color = "Heart Status", shape = "Candidate Blood Type", linetype = "Recipient") +
-    ggtitle(paste0("Donor Blood Type: ", donor_blood_type, ". ", outcome)) +
+    ggtitle(paste0("Match ID: ", match_id, " | Donor: ", donor_id, " (", donor_blood_type, ") | ", outcome)) +
     theme_minimal()
 
   # Add vertical line and rectangle only if there was a transplant
@@ -85,22 +127,31 @@ visualize_mr <- function(donor_id, match_data = heart_only_match_run_with_uscrs)
 
 ## Match run visualization with US-CRS scores
 ```{r visualize-mr-uscrs}
-# Visualize match run for a specific donor colored by US-CRS score
-visualize_mr_with_uscrs <- function(donor_id, match_data = heart_only_match_run_with_uscrs){
+# Visualize match run for a specific match ID colored by US-CRS score
+visualize_mr_with_uscrs <- function(match_id, match_data = heart_only_match_run_with_uscrs){
   
-  donor_blood_type <- match_data %>%
-    filter(DONOR_ID == donor_id) %>%
-    pull(DON_ABO) %>%
-    unique()
+  # Get match run information
+  match_info <- match_data %>%
+    filter(MATCH_ID == match_id) %>%
+    select(DONOR_ID, DON_ABO, MATCH_SUBMIT_DT) %>%
+    distinct()
+  
+  if(nrow(match_info) == 0) {
+    stop("Match ID not found in dataset")
+  }
+  
+  donor_id <- match_info$DONOR_ID
+  donor_blood_type <- match_info$DON_ABO
+  match_date <- match_info$MATCH_SUBMIT_DT
   
   # Get the actual recipient sequence number as numeric value
   tx_seq_number <- match_data %>%
-    filter(is.na(REC_TX_DT) == FALSE & DONOR_ID == donor_id) %>%
+    filter(is.na(REC_TX_DT) == FALSE & MATCH_ID == match_id) %>%
     pull(PTR_SEQUENCE_NUM)
   
   # Get recipient distance for the rectangle
   recipient_distance <- match_data %>%
-    filter(is.na(REC_TX_DT) == FALSE & DONOR_ID == donor_id) %>%
+    filter(is.na(REC_TX_DT) == FALSE & MATCH_ID == match_id) %>%
     pull(PTR_DISTANCE)
   
   if(length(tx_seq_number) == 0 || is.na(tx_seq_number)) {
@@ -110,14 +161,14 @@ visualize_mr_with_uscrs <- function(donor_id, match_data = heart_only_match_run_
   }
   
   p <- match_data %>%
-    filter(DONOR_ID == donor_id) %>%
+    filter(MATCH_ID == match_id) %>%
     ggplot(aes(x = PTR_SEQUENCE_NUM, y = PTR_DISTANCE, 
                color = us_crs_score, shape = CAN_ABO)) +
     geom_point() + 
     scale_color_viridis_c(option = "plasma", na.value = "grey50") +
     labs(x = "Sequence Number", y = "Distance (NM)", 
          color = "US-CRS Score", shape = "Candidate Blood Type", linetype = "Recipient") +
-    ggtitle(paste0("Donor Blood Type: ", donor_blood_type, ". ", outcome)) +
+    ggtitle(paste0("Match ID: ", match_id, " | Donor: ", donor_id, " (", donor_blood_type, ") | ", outcome)) +
     theme_minimal()
 
   # Add vertical line and rectangle only if there was a transplant
@@ -143,17 +194,26 @@ visualize_mr_with_uscrs <- function(donor_id, match_data = heart_only_match_run_
 
 # Sample Visualizations
 
-## Compare status vs US-CRS visualization for sample donor
+## Compare status vs US-CRS visualization for sample match run
 ```{r sample-visualizations}
-# Select a sample donor for demonstration
-sample_donor <- donor_ids[100]
+# Select a sample match for demonstration
+sample_match <- match_ids[100]
+
+# Display match information
+sample_info <- heart_only_match_run_with_uscrs %>%
+  filter(MATCH_ID == sample_match) %>%
+  select(MATCH_ID, DONOR_ID, DON_ABO, MATCH_SUBMIT_DT) %>%
+  distinct()
+
+print(paste("Sample match ID:", sample_match))
+print(sample_info)
 
 # Create side-by-side comparison
-p1 <- visualize_mr(sample_donor) + 
+p1 <- visualize_mr(sample_match) + 
   ggtitle("Current Status-Based Allocation") +
   theme(plot.title = element_text(size = 12))
 
-p2 <- visualize_mr_with_uscrs(sample_donor) + 
+p2 <- visualize_mr_with_uscrs(sample_match) + 
   ggtitle("US-CRS Score-Based Visualization") +
   theme(plot.title = element_text(size = 12))
 
