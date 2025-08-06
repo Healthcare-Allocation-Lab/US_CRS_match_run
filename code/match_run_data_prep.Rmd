@@ -1,7 +1,14 @@
 ---
 title: "Match run data preparation"
+subtitle: "Process SRTR heart match run data and add US-CRS scores"
 output: html_notebook
 ---
+
+This notebook processes the SRTR heart match run data by:
+1. Loading and filtering heart match run records
+2. Adding status codes and blood type information
+3. Mapping time-varying US-CRS scores to candidates
+4. Saving the processed dataset for visualization and counterfactual analysis
  
 ```{r}
 # Load essential libraries
@@ -61,64 +68,11 @@ donor_ids <- heart_only_match_run %>% pull(DONOR_ID) %>% unique()
 
 
 
-# Heart match run visualization 
-```{r}
-# TO DO: add donor information to the title (age, blood type)
-visualize_mr <- function(donor_id){
-  
-  donor_blood_type <- heart_only_match_run %>%
-    filter(DONOR_ID == donor_id) %>%
-    pull(DON_ABO) %>%
-    unique()
-  
-  # Get the actual recipient sequence number as numeric value
-  tx_seq_number <- heart_only_match_run %>%
-    filter(is.na(REC_TX_DT) == FALSE & DONOR_ID == donor_id) %>%
-    pull(PTR_SEQUENCE_NUM)
-  
-  # Get recipient distance for the rectangle
-  recipient_distance <- heart_only_match_run %>%
-    filter(is.na(REC_TX_DT) == FALSE & DONOR_ID == donor_id) %>%
-    pull(PTR_DISTANCE)
-  
-  if(length(tx_seq_number) == 0 || is.na(tx_seq_number)) {
-     outcome <- "Not utilized"
-  } else {
-     outcome <- paste("Recipient at sequence:", tx_seq_number, "\nDistance:", recipient_distance, "NM")
-  }
-  
-  p <- heart_only_match_run %>%
-    filter(DONOR_ID == donor_id) %>%
-    ggplot(aes(x = PTR_SEQUENCE_NUM, y = PTR_DISTANCE, 
-               color = status, shape = CAN_ABO)) +
-    geom_point() + 
-    labs(x = "sequence number", y = "distance (NM)", 
-         shape = "Candidate blood type", linetype = "Recipient") +
-    # add donor blood type to the title
-    ggtitle(paste0("Donor Blood Type: ", donor_blood_type, ". ", outcome)) 
-
-  # Add vertical line and rectangle only if there was a transplant
-  if(length(tx_seq_number) > 0 && !is.na(tx_seq_number)) {
-    p <- p + 
-      geom_vline(aes(xintercept = tx_seq_number, linetype = "transplant"), 
-                 color = "red", linewidth = 1) +
-      geom_rect(
-        xmin = tx_seq_number - 2,
-        xmax = tx_seq_number + 2,
-        ymin = recipient_distance - 50,
-        ymax = recipient_distance + 50,
-        fill = NA,
-        color = "red",
-        linewidth = 1
-      ) + scale_linetype_manual(values = "dashed") 
-  }
-  
-  return(p)
-}
-
-visualize_mr(donor_ids[100])
-
-ggsave(here("results", "match_run_visualization.pdf"))
+# Data summary
+```{r data-summary}
+print(paste("Prepared", nrow(heart_only_match_run), "heart match run records"))
+print(paste("Found", length(donor_ids), "unique donors"))
+print("Data preparation completed - ready for US-CRS mapping")
 ```
 
 
@@ -245,216 +199,43 @@ heart_only_match_run_with_uscrs %>%
   head(10)
 ```
 
-```{r}
-# Summary of US-CRS scores and status comparison
-summary_stats <- heart_only_match_run_with_uscrs %>%
-  filter(!is.na(us_crs_score)) %>%
-  group_by(status) %>%
-  summarise(
-    n_candidates = n(),
-    mean_us_crs = mean(us_crs_score, na.rm = TRUE),
-    median_us_crs = median(us_crs_score, na.rm = TRUE),
-    min_us_crs = min(us_crs_score, na.rm = TRUE),
-    max_us_crs = max(us_crs_score, na.rm = TRUE)
-  )
+```{r uscrs-summary}
+# Quick summary of US-CRS mapping results
+total_records <- nrow(heart_only_match_run_with_uscrs)
+with_uscrs <- sum(!is.na(heart_only_match_run_with_uscrs$us_crs_score))
+missing_uscrs <- sum(is.na(heart_only_match_run_with_uscrs$us_crs_score))
 
-heart_only_match_run_with_uscrs %>%
-  filter(is.na(us_crs_score)) 
+print(paste("US-CRS Mapping Results:"))
+print(paste("- Total records:", total_records))
+print(paste("- With US-CRS scores:", with_uscrs, "(", round(with_uscrs/total_records*100, 1), "%)"))
+print(paste("- Missing US-CRS scores:", missing_uscrs, "(", round(missing_uscrs/total_records*100, 1), "%)"))
 
-heart_only_match_run_with_uscrs %>%
-  ggplot(aes(x = us_crs_score)) +
-           geom_histogram(binwidth = 1, fill = "blue", color = "black") +
-           labs(title = "Distribution of US-CRS Scores", x = "US-CRS Score", y = "Count") +
-           theme_minimal() + facet_wrap(~status, scales = "free_y") 
-```
-
-# Visualize match run with US-CRS scores
-```{r}
-visualize_mr_with_uscrs <- function(donor_id){
-  
-  donor_blood_type <- heart_only_match_run_with_uscrs %>%
-    filter(DONOR_ID == donor_id) %>%
-    pull(DON_ABO) %>%
-    unique()
-  
-  # Get the actual recipient sequence number as numeric value
-  tx_seq_number <- heart_only_match_run_with_uscrs %>%
-    filter(is.na(REC_TX_DT) == FALSE & DONOR_ID == donor_id) %>%
-    pull(PTR_SEQUENCE_NUM)
-  
-  # Get recipient distance for the rectangle
-  recipient_distance <- heart_only_match_run_with_uscrs %>%
-    filter(is.na(REC_TX_DT) == FALSE & DONOR_ID == donor_id) %>%
-    pull(PTR_DISTANCE)
-  
-  if(length(tx_seq_number) == 0 || is.na(tx_seq_number)) {
-     outcome <- "Not utilized"
-  } else {
-     outcome <- paste("Recipient at sequence:", tx_seq_number, "\nDistance:", recipient_distance, "NM")
-  }
-  
-  p <- heart_only_match_run_with_uscrs %>%
-    filter(DONOR_ID == donor_id) %>%
-    ggplot(aes(x = PTR_SEQUENCE_NUM, y = PTR_DISTANCE, 
-               color = us_crs_score, shape = CAN_ABO)) +
-    geom_point() + 
-    scale_color_viridis_c(option = "plasma", na.value = "grey50") +
-    labs(x = "sequence number", y = "distance (NM)", 
-         color = "US-CRS Score", shape = "Candidate blood type", linetype = "Recipient") +
-    # add donor blood type to the title
-    ggtitle(paste0("Donor Blood Type: ", donor_blood_type, ". ", outcome)) 
-
-  # Add vertical line and rectangle only if there was a transplant
-  if(length(tx_seq_number) > 0 && !is.na(tx_seq_number)) {
-    p <- p + 
-      geom_vline(aes(xintercept = tx_seq_number, linetype = "transplant"), 
-                 color = "red", linewidth = 1) +
-      geom_rect(
-        xmin = tx_seq_number - 2,
-        xmax = tx_seq_number + 2,
-        ymin = recipient_distance - 50,
-        ymax = recipient_distance + 50
-        , fill = NA,
-        color = "red",
-        linewidth = 1
-      ) + scale_linetype_manual(values = "dashed")
-  }
-  
-  return(p)
-  
+# Basic US-CRS score range
+if(with_uscrs > 0) {
+  print(paste("- US-CRS score range:", 
+              min(heart_only_match_run_with_uscrs$us_crs_score, na.rm = TRUE), 
+              "to", 
+              max(heart_only_match_run_with_uscrs$us_crs_score, na.rm = TRUE)))
 }
-
-visualize_mr_with_uscrs(donor_ids[100])
 ```
 
-```{r}
-visualize_mr(donor_ids[100])
-```
-```{r}
-heart_only_match_run_with_uscrs
-```
+# Save processed data
+```{r save-data}
+# Display final dataset structure
+print("Final dataset structure:")
+print(colnames(heart_only_match_run_with_uscrs))
+print(paste("Dimensions:", nrow(heart_only_match_run_with_uscrs), "rows ×", ncol(heart_only_match_run_with_uscrs), "columns"))
 
 
-# Counterfactual match run - US-CRS based allocation
-```{r}
-# Function to determine blood type compatibility
-is_blood_compatible <- function(donor_abo, candidate_abo) {
-  case_when(
-    donor_abo == "O" & candidate_abo %in% c("O", "B") ~ "primary",
-    donor_abo == "O" & candidate_abo %in% c("A", "AB") ~ "secondary", 
-    donor_abo == "A" & candidate_abo %in% c("A", "AB") ~ "primary",
-    donor_abo == "B" & candidate_abo %in% c("B", "AB") ~ "primary",
-    donor_abo == "AB" & candidate_abo == "AB" ~ "primary",
-    TRUE ~ "incompatible"
-  )
-}
+# Save the processed dataset with US-CRS scores
+save(heart_only_match_run_with_uscrs, 
+     file = here("data", "heart_only_match_run_with_uscrs.Rdata"))
 
-# Function to assign US-CRS based classifications following Table 6-7 structure
-assign_uscrs_classification <- function(match_data) {
-  
-  match_data %>%
-    mutate(
-      # Determine donor age category
-      donor_age_category = ifelse(DON_AGE >= 18, "adult", "pediatric"),
-      
-      # Determine candidate age category  
-      candidate_age_category = case_when(
-        str_detect(status, "pediatric") ~ "pediatric",
-        TRUE ~ "adult"
-      ),
-      
-      # Blood type compatibility
-      blood_compatibility = is_blood_compatible(DON_ABO, CAN_ABO),
-      
-      # US-CRS based status categories
-      uscrs_status_numeric = case_when(
-        us_crs_score >= 49 ~ 1,
-        us_crs_score >= 40 & us_crs_score < 49 ~ 2,
-        us_crs_score >= 30 & us_crs_score < 40 ~ 3,
-        us_crs_score >= 20 & us_crs_score < 30 ~ 4,
-        us_crs_score >= 10 & us_crs_score < 20 ~ 5,
-        us_crs_score >= 0 & us_crs_score < 10 ~ 6,
-        TRUE ~ NA_real_
-      ),
-      
-      # Distance categories for allocation (following Table 6-7)
-      distance_category = case_when(
-        PTR_DISTANCE <= 250 ~ "250NM",
-        PTR_DISTANCE <= 500 ~ "500NM",
-        PTR_DISTANCE <= 1000 ~ "1000NM", 
-        PTR_DISTANCE <= 1500 ~ "1500NM",
-        PTR_DISTANCE <= 2500 ~ "2500NM",
-        TRUE ~ "Nation"
-      )
-    ) %>%
-    filter(blood_compatibility != "incompatible") %>%
-    # Create allocation classification similar to Table 6-7
-    mutate(
-      allocation_class = case_when(
-        donor_age_category == "adult" & candidate_age_category == "adult" & 
-          uscrs_status_numeric == 1 & blood_compatibility == "primary" & distance_category == "500NM" ~ 1,
-        
-        donor_age_category == "adult" & candidate_age_category == "pediatric" & 
-          uscrs_status_numeric == 1 & blood_compatibility == "primary" & distance_category == "500NM" ~ 1,
-        
-        donor_age_category == "adult" & candidate_age_category == "adult" & 
-          uscrs_status_numeric == 1 & blood_compatibility == "secondary" & distance_category == "500NM" ~ 2,
-          
-        donor_age_category == "adult" & candidate_age_category == "adult" & 
-          uscrs_status_numeric == 2 & blood_compatibility == "primary" & distance_category == "500NM" ~ 3,
-          
-        donor_age_category == "adult" & candidate_age_category == "adult" & 
-          uscrs_status_numeric == 2 & blood_compatibility == "secondary" & distance_category == "500NM" ~ 4,
-          
-        # Add more classifications following Table 6-7 pattern...
-        # For now, create a simplified version
-        TRUE ~ 999 # Will need to complete all 68 classifications
-      )
-    )
-}
-
-# Test the classification function on a single donor
-test_donor <- heart_only_match_run_with_uscrs %>%
-  filter(DONOR_ID == donor_ids[1]) %>%
-  assign_uscrs_classification()
-
-test_donor %>%
-  select(PTR_SEQUENCE_NUM, us_crs_score, uscrs_status_numeric, 
-         blood_compatibility, distance_category, allocation_class, prob_surv_6wk) %>%
-  arrange(allocation_class, desc(us_crs_score), desc(prob_surv_6wk))
+print("Data saved successfully!")
+print("Next steps:")
+print("1. Run 'match_run_visualizations.Rmd' for analysis and visualization")
+print("2. Run 'counterfactual_mr.Rmd' for US-CRS based allocation simulation")
 ```
 
 
-
-
-# Missing US-CRS score debugging
-```{r}
-missing_us_crs <- heart_only_match_run_with_uscrs %>%
-  filter(is.na(us_crs_score))
-
-missing_us_crs
-```
-```{r}
-cand_thor %>%
-  filter(PX_ID %in% missing_us_crs$PX_ID) %>%
-  select(PX_ID, CAN_AGE_AT_LISTING, CAN_ABO)
-```
-```{r}
-pred_data %>%
-  filter(PX_ID == "1440460")
-```
-
-```{r}
-us_crs_data %>%
-  filter(PX_ID %in% missing_us_crs$PX_ID)
-```
-
-```{r}
-heart_only_match_run_with_uscrs %>%
-  filter(PX_ID==1021104)
-```
-
-```{r}
-us_crs_mapper("1021104", "2022-03-21 04:58:13")
-```
 

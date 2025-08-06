@@ -1,0 +1,234 @@
+---
+title: "Match run visualizations"
+output: html_notebook
+---
+
+This notebook contains visualization functions for analyzing heart match runs with US-CRS scores.
+
+```{r setup}
+# Load essential libraries
+library(tidyverse)
+library(lubridate)  # For date handling
+library(here) # For file path management
+```
+
+# Load match run data with US-CRS scores
+```{r load-data}
+# Load the processed match run data with US-CRS scores
+load(here("data", "heart_only_match_run_with_uscrs.Rdata"))
+
+# Get unique donor IDs for analysis
+donor_ids <- heart_only_match_run_with_uscrs %>% pull(DONOR_ID) %>% unique()
+
+print(paste("Loaded", nrow(heart_only_match_run_with_uscrs), "match run records"))
+print(paste("Found", length(donor_ids), "unique donors"))
+```
+
+# Visualization Functions
+
+## Basic match run visualization (by status)
+```{r visualize-mr}
+# Visualize match run for a specific donor colored by status
+visualize_mr <- function(donor_id, match_data = heart_only_match_run_with_uscrs){
+  
+  donor_blood_type <- match_data %>%
+    filter(DONOR_ID == donor_id) %>%
+    pull(DON_ABO) %>%
+    unique()
+  
+  # Get the actual recipient sequence number as numeric value
+  tx_seq_number <- match_data %>%
+    filter(is.na(REC_TX_DT) == FALSE & DONOR_ID == donor_id) %>%
+    pull(PTR_SEQUENCE_NUM)
+  
+  # Get recipient distance for the rectangle
+  recipient_distance <- match_data %>%
+    filter(is.na(REC_TX_DT) == FALSE & DONOR_ID == donor_id) %>%
+    pull(PTR_DISTANCE)
+  
+  if(length(tx_seq_number) == 0 || is.na(tx_seq_number)) {
+     outcome <- "Not utilized"
+  } else {
+     outcome <- paste("Recipient at sequence:", tx_seq_number, "\nDistance:", recipient_distance, "NM")
+  }
+  
+  p <- match_data %>%
+    filter(DONOR_ID == donor_id) %>%
+    ggplot(aes(x = PTR_SEQUENCE_NUM, y = PTR_DISTANCE, 
+               color = status, shape = CAN_ABO)) +
+    geom_point() + 
+    labs(x = "Sequence Number", y = "Distance (NM)", 
+         color = "Heart Status", shape = "Candidate Blood Type", linetype = "Recipient") +
+    ggtitle(paste0("Donor Blood Type: ", donor_blood_type, ". ", outcome)) +
+    theme_minimal()
+
+  # Add vertical line and rectangle only if there was a transplant
+  if(length(tx_seq_number) > 0 && !is.na(tx_seq_number)) {
+    p <- p + 
+      geom_vline(aes(xintercept = tx_seq_number, linetype = "transplant"), 
+                 color = "red", linewidth = 1) +
+      geom_rect(
+        xmin = tx_seq_number - 2,
+        xmax = tx_seq_number + 2,
+        ymin = recipient_distance - 50,
+        ymax = recipient_distance + 50,
+        fill = NA,
+        color = "red",
+        linewidth = 1
+      ) + 
+      scale_linetype_manual(values = "dashed") 
+  }
+  
+  return(p)
+}
+```
+
+## Match run visualization with US-CRS scores
+```{r visualize-mr-uscrs}
+# Visualize match run for a specific donor colored by US-CRS score
+visualize_mr_with_uscrs <- function(donor_id, match_data = heart_only_match_run_with_uscrs){
+  
+  donor_blood_type <- match_data %>%
+    filter(DONOR_ID == donor_id) %>%
+    pull(DON_ABO) %>%
+    unique()
+  
+  # Get the actual recipient sequence number as numeric value
+  tx_seq_number <- match_data %>%
+    filter(is.na(REC_TX_DT) == FALSE & DONOR_ID == donor_id) %>%
+    pull(PTR_SEQUENCE_NUM)
+  
+  # Get recipient distance for the rectangle
+  recipient_distance <- match_data %>%
+    filter(is.na(REC_TX_DT) == FALSE & DONOR_ID == donor_id) %>%
+    pull(PTR_DISTANCE)
+  
+  if(length(tx_seq_number) == 0 || is.na(tx_seq_number)) {
+     outcome <- "Not utilized"
+  } else {
+     outcome <- paste("Recipient at sequence:", tx_seq_number, "\nDistance:", recipient_distance, "NM")
+  }
+  
+  p <- match_data %>%
+    filter(DONOR_ID == donor_id) %>%
+    ggplot(aes(x = PTR_SEQUENCE_NUM, y = PTR_DISTANCE, 
+               color = us_crs_score, shape = CAN_ABO)) +
+    geom_point() + 
+    scale_color_viridis_c(option = "plasma", na.value = "grey50") +
+    labs(x = "Sequence Number", y = "Distance (NM)", 
+         color = "US-CRS Score", shape = "Candidate Blood Type", linetype = "Recipient") +
+    ggtitle(paste0("Donor Blood Type: ", donor_blood_type, ". ", outcome)) +
+    theme_minimal()
+
+  # Add vertical line and rectangle only if there was a transplant
+  if(length(tx_seq_number) > 0 && !is.na(tx_seq_number)) {
+    p <- p + 
+      geom_vline(aes(xintercept = tx_seq_number, linetype = "transplant"), 
+                 color = "red", linewidth = 1) +
+      geom_rect(
+        xmin = tx_seq_number - 2,
+        xmax = tx_seq_number + 2,
+        ymin = recipient_distance - 50,
+        ymax = recipient_distance + 50,
+        fill = NA,
+        color = "red",
+        linewidth = 1
+      ) + 
+      scale_linetype_manual(values = "dashed")
+  }
+  
+  return(p)
+}
+```
+
+# Sample Visualizations
+
+## Compare status vs US-CRS visualization for sample donor
+```{r sample-visualizations}
+# Select a sample donor for demonstration
+sample_donor <- donor_ids[100]
+
+# Create side-by-side comparison
+p1 <- visualize_mr(sample_donor) + 
+  ggtitle("Current Status-Based Allocation") +
+  theme(plot.title = element_text(size = 12))
+
+p2 <- visualize_mr_with_uscrs(sample_donor) + 
+  ggtitle("US-CRS Score-Based Visualization") +
+  theme(plot.title = element_text(size = 12))
+
+# Display plots
+print(p1)
+print(p2)
+```
+
+# Summary Statistics and Distributions
+
+## US-CRS Score Distribution by Status
+```{r uscrs-distribution}
+# Summary of US-CRS scores by current status
+summary_stats <- heart_only_match_run_with_uscrs %>%
+  filter(!is.na(us_crs_score)) %>%
+  group_by(status) %>%
+  summarise(
+    n_candidates = n(),
+    mean_us_crs = mean(us_crs_score, na.rm = TRUE),
+    median_us_crs = median(us_crs_score, na.rm = TRUE),
+    min_us_crs = min(us_crs_score, na.rm = TRUE),
+    max_us_crs = max(us_crs_score, na.rm = TRUE),
+    .groups = "drop"
+  ) %>%
+  arrange(desc(median_us_crs))
+
+print("US-CRS Score Summary by Current Heart Status:")
+print(summary_stats)
+
+# Histogram of US-CRS scores by status
+uscrs_histogram <- heart_only_match_run_with_uscrs %>%
+  filter(!is.na(us_crs_score)) %>%
+  ggplot(aes(x = us_crs_score)) +
+  geom_histogram(binwidth = 1, fill = "steelblue", color = "white", alpha = 0.8) +
+  labs(title = "Distribution of US-CRS Scores by Current Heart Status", 
+       x = "US-CRS Score", 
+       y = "Count") +
+  theme_minimal() +
+  facet_wrap(~status, scales = "free_y", ncol = 3) +
+  theme(strip.text = element_text(size = 10))
+
+print(uscrs_histogram)
+```
+
+## Missing US-CRS Score Analysis
+```{r missing-uscrs-analysis}
+# Identify candidates missing US-CRS scores
+missing_us_crs <- heart_only_match_run_with_uscrs %>%
+  filter(is.na(us_crs_score))
+
+cat("Missing US-CRS scores:", nrow(missing_us_crs), "out of", nrow(heart_only_match_run_with_uscrs), 
+    "records (", round(nrow(missing_us_crs)/nrow(heart_only_match_run_with_uscrs)*100, 2), "%)\n")
+
+if(nrow(missing_us_crs) > 0) {
+  missing_by_status <- missing_us_crs %>%
+    count(status, sort = TRUE)
+  
+  print("Missing US-CRS scores by status:")
+  print(missing_by_status)
+}
+```
+
+# Export Visualizations
+
+## Save sample plots
+```{r save-plots}
+# Create results directory if it doesn't exist
+if (!dir.exists(here("results"))) {
+  dir.create(here("results"))
+}
+
+# Save the comparison plots
+ggsave(here("results", "status_based_visualization.pdf"), p1, width = 10, height = 6)
+ggsave(here("results", "uscrs_based_visualization.pdf"), p2, width = 10, height = 6)
+ggsave(here("results", "uscrs_score_distribution.pdf"), uscrs_histogram, width = 12, height = 8)
+
+cat("Visualizations saved to results/ directory\n")
+```
