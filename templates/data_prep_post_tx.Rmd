@@ -1,0 +1,51 @@
+---
+title: "SRTR Data Preparation Template"
+author: "Your Name"
+date: "`r Sys.Date()`"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+# Load essential libraries
+library(tidyverse)
+library(haven)  # For reading SRTR SAS files
+library(lubridate)  # For date handling
+
+  # Specify file paths
+cand_kipa_path <- "path/to/CAND_KIPA.sas7bdat"
+tx_hr_path <- "path/to/TX_HR.sas7bdat"
+
+# Load datasets
+cand_kipa <- read_sas(cand_kipa_path)
+tx_hr <- read_sas(tx_hr_path)
+
+# Filter to cohort
+cand_thor <- cand_thor |> 
+  subset(REC_TX_DT >= as.Date("2019-01-01") & REC_TX_DT <= as.Date("2022-12-31") & ORG_TY == "HR")
+
+```
+
+# Define outcome and time variables (ex. graft failure and death as defining event)
+```{r}
+
+new_policy = new_policy %>%
+            mutate(death_ind = ifelse(is.na(TFL_DEATH_DT), 0, 1), 
+                   graft_ind = ifelse(is.na(TFL_GRAFT_DT), 0, 1), 
+                   event = pmax(death_ind , graft_ind))
+```
+
+```{r}
+#time to graft failure, death, or censoring
+new_policy = new_policy %>% mutate(death_time = difftime(new_policy$TFL_DEATH_DT,new_policy$REC_TX_DT, units = "days"),
+                      graft_time = difftime(new_policy$TFL_GRAFT_DT,new_policy$REC_TX_DT, units = "days"),
+                      censored_time = difftime(new_policy$TFL_LAFUDATE, new_policy$REC_TX_DT, units = "days"))
+
+new_policy = new_policy %>% mutate(death_time = replace(new_policy$death_time, is.na(new_policy$death_time), 1000),
+                      graft_time = replace(new_policy$graft_time, is.na(new_policy$graft_time), 1000))
+                      
+new_policy = new_policy %>% mutate (time = pmin(new_policy$death_time, new_policy$graft_time, new_policy$censored_time))
+
+
+
+```
+
