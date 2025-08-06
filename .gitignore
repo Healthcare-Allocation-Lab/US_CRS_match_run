@@ -1,6 +1,6 @@
 # Ignore data files (large SRTR datasets)
-data/*.sas7bdat
-data/*.Rdata
+*.sas7bdat
+*.Rdata
 
 # Ignore R project files
 .Rproj.user

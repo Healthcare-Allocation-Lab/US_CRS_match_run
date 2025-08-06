@@ -125,6 +125,25 @@ visualize_mr <- function(match_id, match_data = heart_only_match_run_with_uscrs)
 }
 ```
 
+
+```{r}
+#status distribution plot
+heart_only_match_run_with_uscrs %>%
+  ggplot(aes(x = status)) +
+  geom_bar(fill = "steelblue", color = "white") +
+  labs(title = "Distribution of Heart Status in Match Runs", 
+       x = "Heart Status", 
+       y = "Count") +
+  theme_minimal() +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1))
+```
+
+```{r}
+heart_only_match_run_with_uscrs %>%
+  count(status)
+```
+
+
 ## Match run visualization with US-CRS scores
 ```{r visualize-mr-uscrs}
 # Visualize match run for a specific match ID colored by US-CRS score
@@ -160,16 +179,29 @@ visualize_mr_with_uscrs <- function(match_id, match_data = heart_only_match_run_
      outcome <- paste("Recipient at sequence:", tx_seq_number, "\nDistance:", recipient_distance, "NM")
   }
   
+  # Greyscale for US-CRS, ordered colors for status urgency
   p <- match_data %>%
     filter(MATCH_ID == match_id) %>%
     ggplot(aes(x = PTR_SEQUENCE_NUM, y = PTR_DISTANCE, 
-               color = us_crs_score, shape = CAN_ABO)) +
-    geom_point() + 
-    scale_color_viridis_c(option = "plasma", na.value = "grey50") +
+               fill = us_crs_score, color = status)) +
+    geom_point(shape = 21, size = 4, alpha = 0.8, stroke = 1.5) + 
+    scale_fill_gradient(low = "white", high = "black", na.value = "grey90", 
+                        name = "US-CRS Score") +
+    scale_color_manual(values = c("Status 1" = "#d73027",                    # Most urgent - red
+                                  "Status 1A (pediatric)" = "#d73027",       # Most urgent - red  
+                                  "Status 1B (pediatric)" = "#f46d43",       # Very urgent - orange-red
+                                  "Status 2" = "#fdae61",                     # High urgent - orange
+                                  "Status 2 (pediatric)" = "#fdae61",        # High urgent - orange
+                                  "Status 3" = "#fee08b",                     # Moderate urgent - yellow
+                                  "Status 4" = "#d9ef8b",                     # Less urgent - light green
+                                  "Status 5" = "#91bfdb",                     # Low urgent - light blue
+                                  "Status 6" = "#4575b4"),                    # Least urgent - blue
+                       name = "Heart Status") +
     labs(x = "Sequence Number", y = "Distance (NM)", 
-         color = "US-CRS Score", shape = "Candidate Blood Type", linetype = "Recipient") +
+         fill = "US-CRS Score", color = "Heart Status", linetype = "Recipient", shape = "Candidate blood type") +
     ggtitle(paste0("Match ID: ", match_id, " | Donor: ", donor_id, " (", donor_blood_type, ") | ", outcome)) +
     theme_minimal()
+    
 
   # Add vertical line and rectangle only if there was a transplant
   if(length(tx_seq_number) > 0 && !is.na(tx_seq_number)) {
@@ -190,6 +222,291 @@ visualize_mr_with_uscrs <- function(match_id, match_data = heart_only_match_run_
   
   return(p)
 }
+```
+
+# Status Display Experimentation Results
+
+**SELECTED APPROACH**: Version 4 (Fill + Stroke) with Greyscale US-CRS ✅
+
+**Final Implementation:**
+- **Fill**: US-CRS scores mapped to greyscale (white=low, black=high)
+- **Stroke**: Status urgency mapped to ordered color scale (red=most urgent → blue=least urgent)
+- **Shape**: Circle with border (shape=21) for optimal fill+stroke display
+
+**Status Color Mapping (Most → Least Urgent):**
+- Status 1, 1A (pediatric): Red (#d73027) - Most urgent
+- Status 1B (pediatric): Orange-red (#f46d43) - Very urgent  
+- Status 2, 2 (pediatric): Orange (#fdae61) - High urgent
+- Status 3: Yellow (#fee08b) - Moderate urgent
+- Status 4: Light green (#d9ef8b) - Less urgent
+- Status 5: Light blue (#91bfdb) - Low urgent  
+- Status 6: Blue (#4575b4) - Least urgent
+
+**Advantages:**
+- Greyscale US-CRS provides clear continuous gradient without color interference
+- Ordered status colors intuitively map urgency levels
+- Fill+stroke approach allows both variables to be clearly visible
+- No visual conflict between the two scales
+
+**Implementation**: Main `visualize_mr_with_uscrs()` function updated with Version 4 approach.
+
+## Archived Experiments
+
+### Version 1: Size mapping for status
+```{r test-version1}
+# Test the current size-based approach
+sample_match <- match_ids[100]
+p1_v1 <- visualize_mr_with_uscrs(sample_match)
+print(p1_v1)
+
+# Save this version
+ggsave(here("results", "uscrs_status_v1_size.png"), p1_v1, width = 12, height = 8, dpi = 300)
+cat("Saved Version 1: Size mapping for status\n")
+```
+
+## Version 2: Shape mapping for status (drop blood type)
+```{r version2-shape}
+# Create Version 2: Use shape for status, drop blood type
+visualize_mr_with_uscrs_v2 <- function(match_id, match_data = heart_only_match_run_with_uscrs){
+  
+  # Get match run information
+  match_info <- match_data %>%
+    filter(MATCH_ID == match_id) %>%
+    select(DONOR_ID, DON_ABO, MATCH_SUBMIT_DT) %>%
+    distinct()
+  
+  if(nrow(match_info) == 0) {
+    stop("Match ID not found in dataset")
+  }
+  
+  donor_id <- match_info$DONOR_ID
+  donor_blood_type <- match_info$DON_ABO
+  
+  # Get transplant info
+  tx_seq_number <- match_data %>%
+    filter(is.na(REC_TX_DT) == FALSE & MATCH_ID == match_id) %>%
+    pull(PTR_SEQUENCE_NUM)
+  
+  recipient_distance <- match_data %>%
+    filter(is.na(REC_TX_DT) == FALSE & MATCH_ID == match_id) %>%
+    pull(PTR_DISTANCE)
+  
+  if(length(tx_seq_number) == 0 || is.na(tx_seq_number)) {
+     outcome <- "Not utilized"
+  } else {
+     outcome <- paste("Recipient at sequence:", tx_seq_number, "\nDistance:", recipient_distance, "NM")
+  }
+  
+  # Version 2: Shape mapping for status
+  p <- match_data %>%
+    filter(MATCH_ID == match_id) %>%
+    ggplot(aes(x = PTR_SEQUENCE_NUM, y = PTR_DISTANCE, 
+               color = us_crs_score, shape = status)) +
+    geom_point(size = 3, alpha = 0.8) + 
+    scale_color_viridis_c(option = "plasma", na.value = "grey50") +
+    scale_shape_manual(values = c("Status 1" = 19, "Status 2" = 17, "Status 3" = 15, 
+                                  "Status 4" = 18, "Status 5" = 16, "Status 6" = 8,
+                                  "Status 1A (pediatric)" = 19, "Status 1B (pediatric)" = 17, 
+                                  "Status 2 (pediatric)" = 15)) +
+    labs(x = "Sequence Number", y = "Distance (NM)", 
+         color = "US-CRS Score", shape = "Heart Status", linetype = "Recipient") +
+    ggtitle(paste0("V2: Shape for Status | Match ID: ", match_id, " | Donor: ", donor_id, " (", donor_blood_type, ") | ", outcome)) +
+    theme_minimal()
+
+  # Add transplant indicators
+  if(length(tx_seq_number) > 0 && !is.na(tx_seq_number)) {
+    p <- p + 
+      geom_vline(aes(xintercept = tx_seq_number, linetype = "transplant"), 
+                 color = "red", linewidth = 1) +
+      geom_rect(
+        xmin = tx_seq_number - 2, xmax = tx_seq_number + 2,
+        ymin = recipient_distance - 50, ymax = recipient_distance + 50,
+        fill = NA, color = "red", linewidth = 1
+      ) + 
+      scale_linetype_manual(values = "dashed")
+  }
+  
+  return(p)
+}
+
+# Test Version 2
+p1_v2 <- visualize_mr_with_uscrs_v2(sample_match)
+print(p1_v2)
+
+# Save Version 2
+ggsave(here("results", "uscrs_status_v2_shape.png"), p1_v2, width = 12, height = 8, dpi = 300)
+cat("Saved Version 2: Shape mapping for status\n")
+```
+
+## Version 3: Shape + Size combined
+```{r version3-combined}
+# Version 3: Use both shape for status and size for priority within status
+visualize_mr_with_uscrs_v3 <- function(match_id, match_data = heart_only_match_run_with_uscrs){
+  
+  # Get match run information (abbreviated for space)
+  match_info <- match_data %>%
+    filter(MATCH_ID == match_id) %>%
+    select(DONOR_ID, DON_ABO) %>% distinct()
+  
+  donor_id <- match_info$DONOR_ID
+  donor_blood_type <- match_info$DON_ABO
+  
+  # Get transplant info
+  tx_seq_number <- match_data %>%
+    filter(is.na(REC_TX_DT) == FALSE & MATCH_ID == match_id) %>%
+    pull(PTR_SEQUENCE_NUM)
+  
+  recipient_distance <- match_data %>%
+    filter(is.na(REC_TX_DT) == FALSE & MATCH_ID == match_id) %>%
+    pull(PTR_DISTANCE)
+  
+  outcome <- if(length(tx_seq_number) == 0 || is.na(tx_seq_number)) {
+    "Not utilized"
+  } else {
+    paste("Recipient at sequence:", tx_seq_number, "\nDistance:", recipient_distance, "NM")
+  }
+  
+  # Create priority sizes - Status 1 largest, pediatric slightly larger
+  match_data_filtered <- match_data %>%
+    filter(MATCH_ID == match_id) %>%
+    mutate(
+      status_priority = case_when(
+        status == "Status 1A (pediatric)" ~ 5,
+        status == "Status 1" ~ 4.5,
+        status == "Status 1B (pediatric)" ~ 4,
+        status == "Status 2" ~ 3.5,
+        status == "Status 2 (pediatric)" ~ 3.5,
+        status == "Status 3" ~ 3,
+        status == "Status 4" ~ 2.5,
+        status == "Status 5" ~ 2,
+        status == "Status 6" ~ 1.5,
+        TRUE ~ 2
+      )
+    )
+  
+  # Version 3: Shape for status + size for priority
+  p <- match_data_filtered %>%
+    ggplot(aes(x = PTR_SEQUENCE_NUM, y = PTR_DISTANCE, 
+               color = us_crs_score, shape = status, size = status_priority)) +
+    geom_point(alpha = 0.8) + 
+    scale_color_viridis_c(option = "plasma", na.value = "grey50") +
+    scale_shape_manual(values = c("Status 1" = 19, "Status 2" = 17, "Status 3" = 15, 
+                                  "Status 4" = 18, "Status 5" = 16, "Status 6" = 8,
+                                  "Status 1A (pediatric)" = 19, "Status 1B (pediatric)" = 17, 
+                                  "Status 2 (pediatric)" = 15)) +
+    scale_size_identity() +
+    labs(x = "Sequence Number", y = "Distance (NM)", 
+         color = "US-CRS Score", shape = "Heart Status", linetype = "Recipient") +
+    ggtitle(paste0("V3: Shape + Size | Match ID: ", match_id, " | Donor: ", donor_id, " (", donor_blood_type, ") | ", outcome)) +
+    theme_minimal()
+
+  # Add transplant indicators
+  if(length(tx_seq_number) > 0 && !is.na(tx_seq_number)) {
+    p <- p + 
+      geom_vline(aes(xintercept = tx_seq_number, linetype = "transplant"), 
+                 color = "red", linewidth = 1) +
+      geom_rect(
+        xmin = tx_seq_number - 2, xmax = tx_seq_number + 2,
+        ymin = recipient_distance - 50, ymax = recipient_distance + 50,
+        fill = NA, color = "red", linewidth = 1
+      ) + 
+      scale_linetype_manual(values = "dashed")
+  }
+  
+  return(p)
+}
+
+# Test Version 3
+p1_v3 <- visualize_mr_with_uscrs_v3(sample_match)
+print(p1_v3)
+
+ggsave(here("results", "uscrs_status_v3_shape_size.png"), p1_v3, width = 12, height = 8, dpi = 300)
+cat("Saved Version 3: Shape + Size mapping\n")
+```
+
+## Version 4: Status border/stroke approach
+```{r version4-stroke}
+# Version 4: Use stroke/border color for status 
+visualize_mr_with_uscrs_v4 <- function(match_id, match_data = heart_only_match_run_with_uscrs){
+  
+  # Get match run information (abbreviated)
+  match_info <- match_data %>%
+    filter(MATCH_ID == match_id) %>%
+    select(DONOR_ID, DON_ABO) %>% distinct()
+  
+  donor_id <- match_info$DONOR_ID
+  donor_blood_type <- match_info$DON_ABO
+  
+  # Get transplant info
+  tx_info <- match_data %>%
+    filter(is.na(REC_TX_DT) == FALSE & MATCH_ID == match_id)
+  
+  outcome <- if(nrow(tx_info) == 0) {
+    "Not utilized"
+  } else {
+    paste("Recipient at sequence:", tx_info$PTR_SEQUENCE_NUM, "\nDistance:", tx_info$PTR_DISTANCE, "NM")
+  }
+  
+  # Version 4: Fill for US-CRS, stroke color for status
+  p <- match_data %>%
+    filter(MATCH_ID == match_id) %>%
+    mutate(
+      status_color = case_when(
+        str_detect(status, "Status 1") ~ "red",
+        str_detect(status, "Status 2") ~ "orange", 
+        str_detect(status, "Status 3") ~ "yellow",
+        str_detect(status, "Status 4") ~ "green",
+        str_detect(status, "Status 5") ~ "blue",
+        str_detect(status, "Status 6") ~ "purple",
+        TRUE ~ "black"
+      )
+    ) %>%
+    ggplot(aes(x = PTR_SEQUENCE_NUM, y = PTR_DISTANCE, 
+               fill = us_crs_score, color = status)) +
+    geom_point(shape = 21, size = 4, alpha = 0.8, stroke = 1.5) + 
+    scale_fill_viridis_c(option = "plasma", na.value = "grey50") +
+    scale_color_manual(values = c("Status 1" = "red", "Status 2" = "orange", "Status 3" = "yellow", 
+                                  "Status 4" = "green", "Status 5" = "blue", "Status 6" = "purple",
+                                  "Status 1A (pediatric)" = "red", "Status 1B (pediatric)" = "orange", 
+                                  "Status 2 (pediatric)" = "yellow")) +
+    labs(x = "Sequence Number", y = "Distance (NM)", 
+         fill = "US-CRS Score", color = "Heart Status", linetype = "Recipient") +
+    ggtitle(paste0("V4: Fill + Stroke | Match ID: ", match_id, " | Donor: ", donor_id, " (", donor_blood_type, ") | ", outcome)) +
+    theme_minimal()
+
+  # Add transplant indicators
+  if(nrow(tx_info) > 0) {
+    p <- p + 
+      geom_vline(aes(xintercept = tx_info$PTR_SEQUENCE_NUM, linetype = "transplant"), 
+                 color = "black", linewidth = 2) +
+      geom_rect(
+        xmin = tx_info$PTR_SEQUENCE_NUM - 2, xmax = tx_info$PTR_SEQUENCE_NUM + 2,
+        ymin = tx_info$PTR_DISTANCE - 50, ymax = tx_info$PTR_DISTANCE + 50,
+        fill = NA, color = "black", linewidth = 2
+      ) + 
+      scale_linetype_manual(values = "dashed")
+  }
+  
+  return(p)
+}
+
+# Test Version 4
+p1_v4 <- visualize_mr_with_uscrs_v4(sample_match)
+print(p1_v4)
+
+ggsave(here("results", "uscrs_status_v4_fill_stroke.png"), p1_v4, width = 12, height = 8, dpi = 300)
+cat("Saved Version 4: Fill + Stroke approach\n")
+```
+
+## Comparison Summary
+```{r comparison-summary}
+cat("=== STATUS DISPLAY COMPARISON ===\n")
+cat("Version 1: Size for status (color=US-CRS, shape=blood type, size=status)\n")
+cat("Version 2: Shape for status (color=US-CRS, shape=status)\n") 
+cat("Version 3: Shape + Size (color=US-CRS, shape=status, size=priority)\n")
+cat("Version 4: Fill + Stroke (fill=US-CRS, stroke=status)\n")
+cat("\nAll versions saved to results/ directory\n")
+cat("Review the images to determine which approach shows status most clearly!\n")
 ```
 
 # Sample Visualizations
