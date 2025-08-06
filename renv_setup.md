@@ -44,14 +44,28 @@ This project uses `renv` to ensure reproducible package management and consisten
 ### For New Users
 When someone clones this repository:
 
+#### Using RStudio
 1. **Open RStudio**: Open the `US_CRS_match_run.Rproj` file
 2. **renv activates automatically**: The `.Rprofile` loads renv
 3. **Restore packages**: Run `renv::restore()` to install all required packages
+
+#### Using R from Command Line
+1. **Navigate to project directory**: `cd US_CRS_match_run`
+2. **Start R**: `R` (from project directory)
+3. **renv activates automatically**: The `.Rprofile` loads renv
+4. **If renv doesn't activate**: Run `source("renv/activate.R")`
+5. **Verify activation**: Check `.libPaths()` shows project library
+6. **Restore packages**: Run `renv::restore()`
 
 ```r
 # This installs all packages from renv.lock
 renv::restore()
 ```
+
+#### Using Alternative R IDEs (VS Code, Emacs ESS, etc.)
+1. **Set working directory**: Ensure working directory is project root
+2. **Activate renv**: `source("renv/activate.R")` 
+3. **Restore packages**: `renv::restore()`
 
 ### For Development
 
@@ -138,17 +152,48 @@ renv::snapshot()
 
 ## Troubleshooting
 
+### renv Not Activating Automatically
+```r
+# Check if .Rprofile exists and contains renv activation
+file.exists(".Rprofile")
+readLines(".Rprofile")
+
+# Manual activation
+source("renv/activate.R")
+
+# Verify renv is active
+renv::project()  # Should return project path
+.libPaths()[1]   # Should show project-specific library
+```
+
+### Working Directory Issues (Command Line Users)
+```bash
+# Ensure you're in the right directory
+pwd
+# Should show: /path/to/US_CRS_match_run
+
+# Check for required renv files
+ls -la .Rprofile renv/activate.R
+```
+
 ### Package Installation Errors
 ```r
 # Clear renv cache and reinstall
 renv::purge()
 renv::restore()
+
+# Check renv status
+renv::status()
 ```
 
 ### Conflicts with System Packages
 ```r
 # Isolate project completely
 renv::isolate()
+
+# Check library paths
+.libPaths()
+# First path should be project-specific renv library
 ```
 
 ### Reset Environment
@@ -156,6 +201,18 @@ renv::isolate()
 # Nuclear option - rebuild from scratch
 renv::init(force = TRUE)
 ```
+
+### IDE-Specific Issues
+
+**VS Code with R Extension**:
+- Ensure R extension settings point to correct R installation
+- Set working directory: `setwd("/path/to/US_CRS_match_run")`
+- Manually activate: `source("renv/activate.R")`
+
+**Emacs ESS**:
+- Start ESS session from project directory
+- Check working directory with `getwd()`
+- Activate renv if needed: `source("renv/activate.R")`
 
 ## Benefits for This Project
 

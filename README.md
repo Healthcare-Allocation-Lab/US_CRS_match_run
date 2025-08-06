@@ -21,10 +21,30 @@ This project simulates heart allocation match runs to evaluate how outcomes woul
    cd US_CRS_match_run
    ```
 
-2. **Open in RStudio**
+2. **Activate the renv environment**
+
+   **Option A: Using RStudio**
    ```r
    # Open the US_CRS_match_run.Rproj file in RStudio
    # This automatically activates the renv environment
+   ```
+
+   **Option B: Using R from command line**
+   ```bash
+   # Navigate to project directory
+   cd US_CRS_match_run
+   
+   # Start R in the project directory
+   R
+   ```
+   
+   ```r
+   # renv should activate automatically via .Rprofile
+   # If not, manually activate:
+   source("renv/activate.R")
+   
+   # Verify renv is active (should show project library path)
+   .libPaths()
    ```
 
 3. **Install required packages**
@@ -42,11 +62,13 @@ This project simulates heart allocation match runs to evaluate how outcomes woul
 
 4. **Verify setup**
    ```r
-   # Check that renv is active
-   renv::status()
+   # Run automated setup verification (recommended)
+   source("setup_check.R")
    
-   # Load essential libraries to test
-   library(tidyverse)
+   # Or check manually:
+   renv::status()           # Check that renv is active
+   .libPaths()[1]           # Verify project library is being used
+   library(tidyverse)       # Test loading essential packages
    library(haven)
    library(furrr)
    ```
