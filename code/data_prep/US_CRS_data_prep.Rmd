@@ -1,0 +1,33 @@
+---
+title: "US CRS data prep"
+output: html_notebook
+---
+
+This notebook constructs the `us_crs_history.Rdata` object, which contains a longitudinal record of US CRS scores for each heart transplant candidate. The data is sourced from the SRTR SAF, heart justification, and risk stratification files, which are processed to create a time-varying US CRS score.
+
+```{r}
+# Load essential libraries
+library(tidyverse)
+library(haven)  # For reading SRTR SAS files
+library(lubridate)  # For date handling
+library(here) # For file path management
+```
+
+```{r}
+# Specify file paths
+tx_hr_path <- here("data", "tx_hr.sas7bdat")
+cand_thor_path <- here("data", "cand_thor.sas7bdat")
+## TO DO: heart justification files, risk adjustment files
+```
+
+```{r}
+# load in all sas7bdat files in the data folder
+#tx_hr <- read_sas(tx_hr_path)
+#cand_thor <- read_sas(cand_thor_path)
+```
+
+# export `us_crs_history.Rdata`
+```{r}
+
+```
+

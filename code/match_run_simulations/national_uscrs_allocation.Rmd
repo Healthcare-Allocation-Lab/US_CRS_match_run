@@ -1,0 +1,527 @@
+---
+title: "National US-CRS Allocation System"
+subtitle: "Simplified distance-free US-CRS based heart allocation"
+output: html_notebook
+---
+
+This notebook implements a simplified national US-CRS based heart allocation system that ignores geographic distance while maintaining essential prioritization for pediatric status, donor age groups, and ABO compatibility.
+
+## Key Features:
+- **No Distance Constraints**: National allocation pool for all organs
+- **Simplified Classifications**: 24 main classes (vs 172 in full system)
+- **Pediatric Protection**: Pediatric candidates prioritized for pediatric donors
+- **US-CRS Priority**: Higher scores indicate higher transplant need
+- **Blood Type Compatibility**: Primary matches preferred over secondary
+
+## Output:
+- `national_uscrs_classification`: Classification number (1-24+) per national allocation
+- `national_uscrs_sequence`: New sequence number based on national US-CRS rules
+
+```{r setup}
+# Load essential libraries
+library(tidyverse)
+library(haven)      # For SAS file reading
+library(lubridate)  # For date handling
+library(here)       # For file path management
+```
+
+# Load match run data with US-CRS scores
+```{r load-data}
+# Load the processed match run data with US-CRS scores and waiting times
+load(here("data", "heart_only_match_run_with_uscrs.Rdata"))
+
+print(paste("Loaded", nrow(heart_only_match_run_with_uscrs), "match run records"))
+
+# Verify waiting time column is available
+if("waiting_time_days" %in% colnames(heart_only_match_run_with_uscrs)) {
+  waiting_summary <- heart_only_match_run_with_uscrs %>%
+    filter(!is.na(waiting_time_days) & waiting_time_days >= 0) %>%
+    summarise(
+      records_with_waiting_time = n(),
+      mean_waiting = round(mean(waiting_time_days), 1),
+      median_waiting = round(median(waiting_time_days), 1)
+    )
+  print("Waiting time data available:")
+  print(waiting_summary)
+} else {
+  print("Warning: waiting_time_days column not found. Please regenerate data using updated match_run_data_prep.Rmd")
+}
+
+print("Ready for National US-CRS allocation")
+```
+
+# National US-CRS Allocation Functions
+```{r allocation-functions}
+# Function to determine blood type compatibility (handles A1, A2, A1B, A2B variants)
+is_blood_compatible <- function(donor_abo, candidate_abo) {
+  
+  # Normalize blood types to basic ABO groups
+  normalize_abo <- function(abo) {
+    case_when(
+      abo %in% c("A", "A1", "A2") ~ "A",
+      abo %in% c("B") ~ "B", 
+      abo %in% c("AB", "A1B", "A2B") ~ "AB",
+      abo %in% c("O") ~ "O",
+      TRUE ~ abo  # Keep original if not recognized
+    )
+  }
+  
+  # Normalize both donor and candidate ABO
+  donor_norm <- normalize_abo(donor_abo)
+  candidate_norm <- normalize_abo(candidate_abo)
+  
+  # Apply compatibility rules
+  case_when(
+    donor_norm == "O" & candidate_norm %in% c("O", "B") ~ "primary",
+    donor_norm == "O" & candidate_norm %in% c("A", "AB") ~ "secondary", 
+    donor_norm == "A" & candidate_norm %in% c("A", "AB") ~ "primary",
+    donor_norm == "B" & candidate_norm %in% c("B", "AB") ~ "primary",
+    donor_norm == "AB" & candidate_norm == "AB" ~ "primary",
+    TRUE ~ "incompatible"
+  )
+}
+
+# Function to assign national US-CRS classifications (24 main classes)
+assign_national_uscrs_classification <- function(match_data) {
+  
+  match_data %>%
+    mutate(
+      # Determine donor age category
+      donor_age_category = ifelse(DON_AGE >= 18, "adult", "pediatric"),
+      
+      # Determine candidate age category and pediatric status mapping
+      candidate_age_category = case_when(
+        str_detect(status, "pediatric") ~ "pediatric",
+        PTR_STAT_CD %in% c("2010", "2020", "2030") ~ "pediatric",
+        CAN_AGE_AT_LISTING < 18 ~ "pediatric",
+        TRUE ~ "adult"
+      ),
+      
+      # Blood type compatibility
+      blood_compatibility = is_blood_compatible(DON_ABO, CAN_ABO),
+      
+      # US-CRS status categories for adults
+      uscrs_status_numeric = case_when(
+        us_crs_score >= 49 ~ 1,
+        us_crs_score >= 40 & us_crs_score < 49 ~ 2,
+        us_crs_score >= 30 & us_crs_score < 40 ~ 3,
+        us_crs_score >= 20 & us_crs_score < 30 ~ 4,
+        us_crs_score >= 10 & us_crs_score < 20 ~ 5,
+        us_crs_score >= 0 & us_crs_score < 10 ~ 6,
+        TRUE ~ NA_real_
+      ),
+      
+      # Pediatric status extraction
+      pediatric_status = case_when(
+        status == "Status 1A (pediatric)" ~ "1A",
+        status == "Status 1B (pediatric)" ~ "1B", 
+        status == "Status 2 (pediatric)" ~ "2",
+        TRUE ~ NA_character_
+      )
+    ) %>%
+    filter(blood_compatibility != "incompatible") %>%
+    mutate(
+      # National US-CRS allocation classification (24 main classes)
+      national_uscrs_classification = case_when(
+        
+        # TABLE N1: Adult Donors (≥18 years) - Classes 1-12
+        donor_age_category == "adult" ~ case_when(
+          # Class 1-2: Status 1 + Ped 1A (Highest Priority)
+          (candidate_age_category == "adult" & uscrs_status_numeric == 1 |
+           candidate_age_category == "pediatric" & pediatric_status == "1A") & 
+           blood_compatibility == "primary" ~ 1,
+          (candidate_age_category == "adult" & uscrs_status_numeric == 1 |
+           candidate_age_category == "pediatric" & pediatric_status == "1A") & 
+           blood_compatibility == "secondary" ~ 2,
+          
+          # Class 3-4: Status 2
+          candidate_age_category == "adult" & uscrs_status_numeric == 2 & 
+           blood_compatibility == "primary" ~ 3,
+          candidate_age_category == "adult" & uscrs_status_numeric == 2 & 
+           blood_compatibility == "secondary" ~ 4,
+          
+          # Class 5-6: Status 3 + Ped 1B
+          (candidate_age_category == "adult" & uscrs_status_numeric == 3 |
+           candidate_age_category == "pediatric" & pediatric_status == "1B") & 
+           blood_compatibility == "primary" ~ 5,
+          (candidate_age_category == "adult" & uscrs_status_numeric == 3 |
+           candidate_age_category == "pediatric" & pediatric_status == "1B") & 
+           blood_compatibility == "secondary" ~ 6,
+          
+          # Class 7-8: Status 4
+          candidate_age_category == "adult" & uscrs_status_numeric == 4 & 
+           blood_compatibility == "primary" ~ 7,
+          candidate_age_category == "adult" & uscrs_status_numeric == 4 & 
+           blood_compatibility == "secondary" ~ 8,
+          
+          # Class 9-10: Status 5  
+          candidate_age_category == "adult" & uscrs_status_numeric == 5 & 
+           blood_compatibility == "primary" ~ 9,
+          candidate_age_category == "adult" & uscrs_status_numeric == 5 & 
+           blood_compatibility == "secondary" ~ 10,
+          
+          # Class 11-12: Status 6 + Ped 2 (Lowest Priority)
+          (candidate_age_category == "adult" & uscrs_status_numeric == 6 |
+           candidate_age_category == "pediatric" & pediatric_status == "2") & 
+           blood_compatibility == "primary" ~ 11,
+          (candidate_age_category == "adult" & uscrs_status_numeric == 6 |
+           candidate_age_category == "pediatric" & pediatric_status == "2") & 
+           blood_compatibility == "secondary" ~ 12,
+          
+          TRUE ~ 999
+        ),
+        
+        # TABLE N2: Pediatric Donors (<18 years) - Classes 13-24+
+        donor_age_category == "pediatric" ~ case_when(
+          # Class 13-14: Pediatric Status 1A (PEDIATRIC PRIORITY)
+          candidate_age_category == "pediatric" & pediatric_status == "1A" & 
+           blood_compatibility == "primary" ~ 13,
+          candidate_age_category == "pediatric" & pediatric_status == "1A" & 
+           blood_compatibility == "secondary" ~ 14,
+          
+          # Class 15-16: Adult Status 1 (After pediatric 1A)
+          candidate_age_category == "adult" & uscrs_status_numeric == 1 & 
+           blood_compatibility == "primary" ~ 15,
+          candidate_age_category == "adult" & uscrs_status_numeric == 1 & 
+           blood_compatibility == "secondary" ~ 16,
+          
+          # Class 17-18: Pediatric Status 1B (PEDIATRIC PRIORITY)
+          candidate_age_category == "pediatric" & pediatric_status == "1B" & 
+           blood_compatibility == "primary" ~ 17,
+          candidate_age_category == "pediatric" & pediatric_status == "1B" & 
+           blood_compatibility == "secondary" ~ 18,
+          
+          # Class 19-20: Adult Status 2 (After pediatric 1B)
+          candidate_age_category == "adult" & uscrs_status_numeric == 2 & 
+           blood_compatibility == "primary" ~ 19,
+          candidate_age_category == "adult" & uscrs_status_numeric == 2 & 
+           blood_compatibility == "secondary" ~ 20,
+          
+          # Class 21-22: Adult Status 3
+          candidate_age_category == "adult" & uscrs_status_numeric == 3 & 
+           blood_compatibility == "primary" ~ 21,
+          candidate_age_category == "adult" & uscrs_status_numeric == 3 & 
+           blood_compatibility == "secondary" ~ 22,
+          
+          # Class 23-24: Pediatric Status 2 (PEDIATRIC PRIORITY)  
+          candidate_age_category == "pediatric" & pediatric_status == "2" & 
+           blood_compatibility == "primary" ~ 23,
+          candidate_age_category == "pediatric" & pediatric_status == "2" & 
+           blood_compatibility == "secondary" ~ 24,
+          
+          # Continue with Adult Status 4, 5, 6...
+          # For simplicity, remaining classes continue the pattern
+          candidate_age_category == "adult" & uscrs_status_numeric %in% c(4, 5, 6) ~ 25 + (uscrs_status_numeric - 4) * 2 + ifelse(blood_compatibility == "secondary", 1, 0),
+          
+          TRUE ~ 999
+        ),
+        
+        TRUE ~ 999
+      )
+    )
+}
+
+# Function to calculate national US-CRS sequence within each match run
+calculate_national_uscrs_sequence <- function(classified_data) {
+  
+  classified_data %>%
+    group_by(MATCH_ID) %>%
+    arrange(
+      national_uscrs_classification,           # Primary: Classification (lower = higher priority)
+      desc(us_crs_score),                     # Secondary: Higher US-CRS score within class
+      desc(1 - prob_surv_6wk),                # Tertiary: Lower survival probability (higher risk)
+      desc(waiting_time_days)                 # Quaternary: Longer waiting time
+    ) %>%
+    mutate(
+      national_uscrs_sequence = row_number()  # New sequence based on national US-CRS allocation
+    ) %>%
+    ungroup()
+}
+```
+
+# Test National Allocation
+```{r test-national-allocation}
+# Test the national classification and sequencing on a sample match run
+sample_match_id <- unique(heart_only_match_run_with_uscrs$MATCH_ID)[1]
+
+# Apply national allocation to sample match run
+test_national_data <- heart_only_match_run_with_uscrs %>%
+  filter(MATCH_ID == sample_match_id) %>%
+  assign_national_uscrs_classification() %>%
+  calculate_national_uscrs_sequence()
+
+# Display comparison of original vs national US-CRS sequence
+test_national_comparison <- test_national_data %>%
+  select(PTR_SEQUENCE_NUM, national_uscrs_sequence, national_uscrs_classification, 
+         uscrs_status_numeric, us_crs_score, prob_surv_6wk, 
+         waiting_time_days, blood_compatibility, donor_age_category, candidate_age_category) %>%
+  arrange(national_uscrs_sequence)
+
+print("Sample National US-CRS Allocation:")
+print(test_national_comparison)
+
+# Summary of classification distribution  
+cat("\nClassification Distribution:\n")
+print(table(test_national_data$national_uscrs_classification))
+
+cat("\nDonor Type:", unique(test_national_data$donor_age_category), "\n")
+cat("Blood Types Present:", unique(test_national_data$blood_compatibility), "\n")
+```
+
+# Apply National Allocation to Full Dataset  
+```{r apply-national-allocation}
+print("Starting National US-CRS allocation for full dataset...")
+
+print(paste("Processing", nrow(heart_only_match_run_with_uscrs), "records..."))
+
+# Apply national classification and sequencing
+heart_only_match_run_national <- heart_only_match_run_with_uscrs %>%
+  assign_national_uscrs_classification() %>%
+  calculate_national_uscrs_sequence()
+
+print("National US-CRS allocation completed!")
+
+# Summary statistics
+cat("\nNATIONAL ALLOCATION SUMMARY:\n")
+cat("- Total records processed:", nrow(heart_only_match_run_national), "\n")
+cat("- Records with national classification:", 
+    sum(!is.na(heart_only_match_run_national$national_uscrs_classification) & 
+        heart_only_match_run_national$national_uscrs_classification != 999), "\n")
+
+# Classification distribution
+cat("\nClassification Distribution:\n")
+national_class_summary <- heart_only_match_run_national %>%
+  filter(national_uscrs_classification != 999) %>%
+  count(national_uscrs_classification) %>%
+  arrange(national_uscrs_classification)
+
+print(head(national_class_summary, 15))
+
+# Sequence changes compared to original
+national_sequence_comparison <- heart_only_match_run_national %>%
+  mutate(
+    sequence_change = national_uscrs_sequence - PTR_SEQUENCE_NUM,
+    sequence_rank_change = case_when(
+      sequence_change < 0 ~ "moved_up",
+      sequence_change > 0 ~ "moved_down", 
+      sequence_change == 0 ~ "same_position",
+      TRUE ~ "unknown"
+    )
+  )
+
+cat("\nSEQUENCE CHANGES (National vs Original):\n")
+national_sequence_summary <- national_sequence_comparison %>%
+  count(sequence_rank_change) %>%
+  mutate(percentage = round(n / sum(n) * 100, 1))
+
+print(national_sequence_summary)
+```
+
+
+
+# Detailed Sequence Analysis
+```{r sequence-impact-analysis}
+# Analyze the impact of switching to national US-CRS
+sequence_impact <- heart_only_match_run_national %>%
+  mutate(
+    sequence_change = national_uscrs_sequence - PTR_SEQUENCE_NUM,
+    improvement_category = case_when(
+      sequence_change <= -10 ~ "Major Improvement (≥10 spots up)",
+      sequence_change <= -5 ~ "Moderate Improvement (5-9 spots up)", 
+      sequence_change <= -1 ~ "Minor Improvement (1-4 spots up)",
+      sequence_change == 0 ~ "No Change",
+      sequence_change <= 4 ~ "Minor Decline (1-4 spots down)",
+      sequence_change <= 9 ~ "Moderate Decline (5-9 spots down)",
+      sequence_change >= 10 ~ "Major Decline (≥10 spots down)"
+    ),
+    improvement_category = factor(improvement_category, levels = c(
+      "Major Improvement (≥10 spots up)",
+      "Moderate Improvement (5-9 spots up)", 
+      "Minor Improvement (1-4 spots up)",
+      "No Change",
+      "Minor Decline (1-4 spots down)",
+      "Moderate Decline (5-9 spots down)",
+      "Major Decline (≥10 spots down)"
+    ))
+  )
+
+# Impact by US-CRS score
+p2 <- sequence_impact %>%
+  filter(!is.na(us_crs_score) & !is.na(improvement_category)) %>%
+  ggplot(aes(x = us_crs_score, fill = improvement_category)) +
+  geom_histogram(binwidth = 2, alpha = 0.8, color = "white", size = 0.1) +
+  scale_fill_brewer(type = "div", palette = "RdYlGn", name = "Sequence Change", 
+                    guide = guide_legend(reverse = TRUE)) +
+  labs(
+    title = "Impact of National US-CRS Allocation by Risk Score",
+    subtitle = "How sequence position changes vary across US-CRS risk levels",
+    x = "US-CRS Score (Higher = Higher Transplant Need)",
+    y = "Number of Candidates"
+  ) +
+  theme_minimal() +
+  theme(
+    plot.title = element_text(size = 14, face = "bold"),
+    plot.subtitle = element_text(size = 11, color = "gray40"),
+    legend.position = "bottom",
+    legend.title = element_text(size = 10, face = "bold")
+  ) +
+  guides(fill = guide_legend(nrow = 2, byrow = TRUE))
+
+print(p2)
+
+# Save impact analysis
+ggsave(here("results", "national_uscrs_impact_by_score.png"), p2, 
+       width = 12, height = 8, dpi = 300)
+
+# Summary statistics
+impact_summary <- sequence_impact %>%
+  filter(!is.na(improvement_category)) %>%
+  count(improvement_category) %>%
+  mutate(percentage = round(n / sum(n) * 100, 1))
+
+print("Sequence Change Impact Summary:")
+print(impact_summary)
+```
+
+# Status-Specific Analysis
+```{r status-comparison}
+# Compare how different status groups are affected
+status_impact <- sequence_impact %>%
+  filter(!is.na(status) & !is.na(us_crs_score)) %>%
+  group_by(status) %>%
+  summarise(
+    n_candidates = n(),
+    mean_uscrs = round(mean(us_crs_score, na.rm = TRUE), 1),
+    median_uscrs = round(median(us_crs_score, na.rm = TRUE), 1),
+    mean_sequence_change = round(mean(sequence_change, na.rm = TRUE), 1),
+    median_sequence_change = round(median(sequence_change, na.rm = TRUE), 1),
+    pct_improved = round(sum(sequence_change < 0, na.rm = TRUE) / n() * 100, 1),
+    .groups = "drop"
+  ) %>%
+  arrange(mean_uscrs)
+
+print("Impact by Current Status:")
+print(status_impact)
+
+# Visualization by status
+p3 <- sequence_impact %>%
+  filter(!is.na(status) & !is.na(sequence_change)) %>%
+  ggplot(aes(x = status, y = sequence_change, fill = status)) +
+  geom_boxplot(alpha = 0.7, outlier.alpha = 0.3) +
+  geom_hline(yintercept = 0, linetype = "dashed", color = "red", alpha = 0.7) +
+  scale_fill_viridis_d(option = "turbo", name = "Current Status") +
+  labs(
+    title = "Sequence Position Changes by Current Heart Status",
+    subtitle = "Negative values = improved priority, Positive values = lower priority",
+    x = "Current Heart Status",
+    y = "Sequence Position Change\n(National US-CRS - Current)"
+  ) +
+  theme_minimal() +
+  theme(
+    plot.title = element_text(size = 14, face = "bold"),
+    plot.subtitle = element_text(size = 11, color = "gray40"),
+    axis.text.x = element_text(angle = 45, hjust = 1),
+    legend.position = "none"
+  )
+
+print(p3)
+
+ggsave(here("results", "national_uscrs_status_impact.png"), p3, 
+       width = 10, height = 7, dpi = 300)
+
+cat("Enhanced visualizations saved to results/ directory\n")
+```
+# Average US-CRS by Sequence Position
+```{r}
+# Analyze average US-CRS score by sequence position for both systems
+heart_only_match_run_national %>%
+  select(PX_ID, MATCH_ID, PTR_SEQUENCE_NUM, us_crs_score, national_uscrs_sequence) %>%
+  rename(current_sequence = PTR_SEQUENCE_NUM) %>%
+  pivot_longer(cols = c(current_sequence, national_uscrs_sequence), 
+               names_to = "allocation_system", 
+               values_to = "sequence_position") %>%
+  mutate(
+    allocation_system = case_when(
+      allocation_system == "current_sequence" ~ "Current 6-Status System",
+      allocation_system == "national_uscrs_sequence" ~ "National US-CRS System"
+    ),
+    allocation_system = factor(allocation_system, levels = c("Current 6-Status System", "National US-CRS System"))
+  ) %>%
+  filter(sequence_position <= 200) %>%  # Focus on top 100 candidates for clarity
+  group_by(allocation_system, sequence_position) %>%
+  summarise(
+    mean_us_crs = mean(us_crs_score, na.rm = TRUE),
+    median_us_crs = median(us_crs_score, na.rm = TRUE),
+    n_candidates = n(),
+    .groups = "drop"
+  ) %>%
+  ggplot(aes(x = sequence_position, y = mean_us_crs, color = allocation_system)) +
+  geom_line(size = 1) +
+  geom_point(alpha = 0.7) +
+  labs(
+    title = "Average US-CRS Score by Sequence Position",
+    subtitle = "Comparison between Current 6-Status and National US-CRS Systems",
+    x = "Sequence Position (Lower = Higher Priority)",
+    y = "Average US-CRS Score"
+  ) +
+  theme_minimal() +
+  theme(
+    plot.title = element_text(size = 14, face = "bold"),
+    plot.subtitle = element_text(size = 11, color = "gray40"),
+    legend.position = "right"
+  )
+```
+
+
+# Save National Allocation Results
+```{r save-national-results}
+# Save the complete national allocation dataset
+save(heart_only_match_run_national, 
+     file = here("data", "heart_only_match_run_national.Rdata"))
+
+# Create summary dataset with key variables
+national_summary <- heart_only_match_run_national %>%
+  select(
+    # Original identifiers
+    MATCH_ID, DONOR_ID, PX_ID, DON_AGE,
+    
+    # Original sequence and new national US-CRS sequence  
+    PTR_SEQUENCE_NUM, national_uscrs_sequence,
+    
+    # Classification variables
+    national_uscrs_classification, uscrs_status_numeric, 
+    donor_age_category, candidate_age_category,
+    
+    # Scores and tie-breakers
+    us_crs_score, prob_surv_6wk, waiting_time_days,
+    
+    # Match characteristics
+    blood_compatibility, PTR_DISTANCE,
+    
+    # Original status
+    status, PTR_STAT_CD,
+    
+    # Outcome
+    REC_TX_DT
+  ) %>%
+  mutate(
+    # Calculate changes
+    sequence_change = national_uscrs_sequence - PTR_SEQUENCE_NUM,
+    received_transplant = !is.na(REC_TX_DT)
+  )
+
+# Save summary
+write_csv(national_summary, 
+          here("data", "national_allocation_summary.csv"))
+
+print("National allocation results saved!")
+print("Files created:")
+print("1. heart_only_match_run_national.Rdata - Complete national dataset")
+print("2. national_allocation_summary.csv - Summary with key variables")
+print("")
+print("Key Features:")
+print("- No distance constraints (national allocation)")
+print("- 24+ simplified classifications")
+print("- Pediatric priority for pediatric donors maintained")
+print("- Same US-CRS and tie-breaking logic as full system")
+```

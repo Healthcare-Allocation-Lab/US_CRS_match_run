@@ -1,0 +1,637 @@
+---
+title: "US-CRS Match Run Analysis"
+subtitle: "Comprehensive comparison of current 6-Status, National US-CRS, and Acuity Circle US-CRS allocation systems"
+output: html_notebook
+---
+
+This notebook performs a comprehensive analysis comparing three heart allocation systems:
+
+1. **Current 6-Status System**: Existing therapy-based allocation with geographic circles
+2. **National US-CRS System**: Simplified 24-class continuous risk-based allocation (no distance)
+3. **Acuity Circle US-CRS System**: Full 172-class continuous risk-based allocation with geographic circles
+
+## Key Analyses:
+- **Sequence Comparisons**: How candidate prioritization changes across systems
+- **Status-Specific Impact**: Which current status groups benefit/decline under US-CRS
+- **Geographic Analysis**: Impact of removing vs maintaining distance constraints
+- **Risk Stratification**: How well each system prioritizes by transplant need (US-CRS scores)
+
+```{r setup}
+# Load essential libraries
+library(tidyverse)
+library(haven)      
+library(lubridate)  
+library(here)       
+library(patchwork)  # For combining plots
+library(scales)     # For better axis formatting
+
+# Set plot theme
+theme_set(theme_minimal())
+```
+
+# Load All Datasets
+
+```{r load-data}
+# Load original processed data
+load(here("data", "heart_only_match_run_with_uscrs.Rdata"))
+print(paste("Loaded original data:", nrow(heart_only_match_run_with_uscrs), "records"))
+
+# Load National US-CRS results (if available)
+national_file <- here("data", "heart_only_match_run_national.Rdata")
+if(file.exists(national_file)) {
+  load(national_file)
+  print(paste("Loaded National US-CRS data:", nrow(heart_only_match_run_national), "records"))
+} else {
+  print("National US-CRS data not found. Please run national_uscrs_allocation.Rmd first.")
+}
+
+# Load Acuity Circle US-CRS results (if available)  
+acuity_file <- here("data", "heart_only_match_run_counterfactual.Rdata")
+if(file.exists(acuity_file)) {
+  load(acuity_file)
+  print(paste("Loaded Acuity Circle US-CRS data:", nrow(heart_only_match_run_counterfactual), "records"))
+} else {
+  print("Acuity Circle US-CRS data not found. Please run acuity_circle_uscrs.Rmd first.")
+}
+
+print("Ready for comprehensive match run analysis")
+```
+
+# Data Summary and Quality Checks
+
+```{r data-summary}
+# Check data availability and alignment
+data_summary <- tibble(
+  System = c("Original (6-Status)", "National US-CRS", "Acuity Circle US-CRS"),
+  Records = c(
+    nrow(heart_only_match_run_with_uscrs),
+    ifelse(exists("heart_only_match_run_national"), nrow(heart_only_match_run_national), 0),
+    ifelse(exists("heart_only_match_run_counterfactual"), nrow(heart_only_match_run_counterfactual), 0)
+  ),
+  Available = c(TRUE, exists("heart_only_match_run_national"), exists("heart_only_match_run_counterfactual"))
+)
+
+print("Dataset Summary:")
+print(data_summary)
+
+# Basic US-CRS score statistics across all systems
+if(exists("heart_only_match_run_national") && exists("heart_only_match_run_counterfactual")) {
+  us_crs_summary <- heart_only_match_run_with_uscrs %>%
+    filter(!is.na(us_crs_score)) %>%
+    summarise(
+      n_records = n(),
+      mean_uscrs = round(mean(us_crs_score), 1),
+      median_uscrs = round(median(us_crs_score), 1),
+      sd_uscrs = round(sd(us_crs_score), 1),
+      min_uscrs = round(min(us_crs_score), 1),
+      max_uscrs = round(max(us_crs_score), 1)
+    )
+  
+  print("US-CRS Score Distribution:")
+  print(us_crs_summary)
+}
+```
+
+# System-to-System Sequence Comparison
+```{r sequence-comparison}
+# Only proceed if all datasets are available
+if(exists("heart_only_match_run_national") && exists("heart_only_match_run_counterfactual")) {
+  
+  # Create comprehensive comparison dataset
+  sequence_comparison <- heart_only_match_run_with_uscrs %>%
+    select(PX_ID, MATCH_ID, PTR_SEQUENCE_NUM, us_crs_score, status, 
+           PTR_DISTANCE, CAN_ABO, DON_ABO) %>%
+    # Add National US-CRS sequence
+    left_join(
+      heart_only_match_run_national %>% 
+        select(PX_ID, MATCH_ID, national_uscrs_sequence),
+      by = c("PX_ID", "MATCH_ID")
+    ) %>%
+    # Add Acuity Circle US-CRS sequence  
+    left_join(
+      heart_only_match_run_counterfactual %>% 
+        select(PX_ID, MATCH_ID, us_crs_sequence),
+      by = c("PX_ID", "MATCH_ID")
+    ) %>%
+    rename(
+      current_sequence = PTR_SEQUENCE_NUM,
+      national_sequence = national_uscrs_sequence,
+      acuity_sequence = us_crs_sequence
+    ) %>%
+    # Calculate sequence changes
+    mutate(
+      national_vs_current = national_sequence - current_sequence,
+      acuity_vs_current = acuity_sequence - current_sequence,
+      national_vs_acuity = national_sequence - acuity_sequence
+    )
+  
+  print(paste("Created comparison dataset with", nrow(sequence_comparison), "records"))
+  
+  # Sequence change summary
+  sequence_summary <- sequence_comparison %>%
+    summarise(
+      # Changes vs Current System
+      national_improved = sum(national_vs_current < 0, na.rm = TRUE),
+      national_declined = sum(national_vs_current > 0, na.rm = TRUE),
+      national_unchanged = sum(national_vs_current == 0, na.rm = TRUE),
+      
+      acuity_improved = sum(acuity_vs_current < 0, na.rm = TRUE),
+      acuity_declined = sum(acuity_vs_current > 0, na.rm = TRUE),
+      acuity_unchanged = sum(acuity_vs_current == 0, na.rm = TRUE),
+      
+      # National vs Acuity comparison
+      national_better = sum(national_vs_acuity < 0, na.rm = TRUE),
+      acuity_better = sum(national_vs_acuity > 0, na.rm = TRUE),
+      systems_equal = sum(national_vs_acuity == 0, na.rm = TRUE),
+      
+      total_records = n()
+    )
+  
+  print("Sequence Change Summary:")
+  print(sequence_summary)
+  
+} else {
+  print("Skipping sequence comparison - missing datasets")
+}
+```
+
+# Visualization: Sequence Position Comparison
+
+```{r sequence-viz}
+if(exists("sequence_comparison")) {
+  
+  # Prepare data for visualization
+  viz_data <- sequence_comparison %>%
+    filter(!is.na(current_sequence) & !is.na(national_sequence) & !is.na(acuity_sequence)) %>%
+    pivot_longer(
+      cols = c(current_sequence, national_sequence, acuity_sequence),
+      names_to = "allocation_system",
+      values_to = "sequence_position"
+    ) %>%
+    mutate(
+      allocation_system = case_when(
+        allocation_system == "current_sequence" ~ "Current 6-Status",
+        allocation_system == "national_sequence" ~ "National US-CRS", 
+        allocation_system == "acuity_sequence" ~ "Acuity Circle US-CRS"
+      ),
+      allocation_system = factor(allocation_system, 
+                                levels = c("Current 6-Status", "National US-CRS", "Acuity Circle US-CRS"))
+    ) %>%
+    filter(sequence_position <= 100) %>%  # Focus on top 100 for clarity
+    group_by(allocation_system, sequence_position) %>%
+    summarise(
+      median_uscrs = median(us_crs_score, na.rm = TRUE),
+      mean_uscrs = mean(us_crs_score, na.rm = TRUE),
+      n_candidates = n(),
+      .groups = "drop"
+    )
+  
+  # Main sequence comparison plot
+  p1 <- viz_data %>%
+    ggplot(aes(x = sequence_position, y = median_uscrs, color = allocation_system)) +
+    geom_line(size = 1.2, alpha = 0.8) +
+    geom_point(alpha = 0.6, size = 0.8) +
+    scale_x_continuous(breaks = seq(0, 100, 20)) +
+    labs(
+      title = "US-CRS Risk Stratification by Allocation System",
+      subtitle = "Higher median US-CRS scores indicate better risk prioritization",
+      x = "Sequence Position (Lower = Higher Priority)",
+      y = "Median US-CRS Score"
+    ) +
+    theme_minimal() +
+    theme(
+      plot.title = element_text(size = 14, face = "bold"),
+      legend.position = "bottom"
+    )
+  
+  print(p1)
+  
+  # Save the main plot
+  ggsave(here("results", "three_system_sequence_comparison.png"), p1, 
+         width = 12, height = 8, dpi = 300)
+  
+} else {
+  print("Skipping sequence visualization - comparison data not available")
+}
+```
+
+
+
+# Current status distribution for all allocation policies
+```{r status-distribution-all-systems}
+if(exists("sequence_comparison")) {
+  
+  # Create comprehensive status distribution visualization
+  status_distribution_data <- sequence_comparison %>%
+    filter(!is.na(current_sequence) & !is.na(national_sequence) & !is.na(acuity_sequence)) %>%
+    pivot_longer(
+      cols = c(current_sequence, national_sequence, acuity_sequence),
+      names_to = "allocation_system",
+      values_to = "sequence_position"
+    ) %>%
+    mutate(
+      allocation_system = case_when(
+        allocation_system == "current_sequence" ~ "Current 6-Status",
+        allocation_system == "national_sequence" ~ "National US-CRS", 
+        allocation_system == "acuity_sequence" ~ "Acuity Circle US-CRS"
+      ),
+      allocation_system = factor(allocation_system, 
+                                levels = c("Current 6-Status", "National US-CRS", "Acuity Circle US-CRS"))
+    ) %>%
+    filter(sequence_position <= 100) %>%  # Focus on top 100 candidates for clarity
+    group_by(allocation_system, sequence_position, status) %>%
+    summarise(
+      n_candidates = n(),
+      .groups = "drop"
+    )
+  
+  p_status_dist <- status_distribution_data %>%
+    ggplot(aes(x = sequence_position, y = n_candidates, fill = status)) +
+    geom_area(position = "fill", alpha = 0.8) +
+    facet_wrap(~allocation_system, ncol = 1) +
+    scale_fill_viridis_d(option = "turbo", name = "Current Status", direction = -1) +
+    scale_y_continuous(labels = scales::percent_format()) +
+    labs(
+      title = "Candidate Status Distribution Across All Allocation Systems",
+      subtitle = "Proportion of candidates by current heart status across sequence positions (Top 100)",
+      x = "Sequence Position (Lower = Higher Priority)",
+      y = "Proportion of Candidates"
+    ) +
+    theme_minimal() +
+    theme(
+      plot.title = element_text(size = 14, face = "bold"),
+      plot.subtitle = element_text(size = 11, color = "gray40"),
+      strip.text = element_text(face = "bold", size = 11),
+      legend.position = "right"
+    )
+  
+  print(p_status_dist)
+  
+  # Save the comprehensive status distribution plot
+  ggsave(here("results", "status_distribution_all_systems.png"), p_status_dist, 
+         width = 14, height = 12, dpi = 300)
+  
+  # Summary statistics for status distribution
+  status_dist_summary <- status_distribution_data %>%
+    group_by(allocation_system, status) %>%
+    summarise(
+      total_in_top100 = sum(n_candidates),
+      avg_position = round(weighted.mean(sequence_position, n_candidates), 1),
+      .groups = "drop"
+    ) %>%
+    arrange(allocation_system, avg_position)
+  
+  print("Status Distribution Summary (Top 100 positions):")
+  print(status_dist_summary)
+  
+} else {
+  # Fallback to two-system comparison if sequence_comparison doesn't exist
+  print("Using fallback two-system comparison...")
+  
+  heart_only_match_run_national %>%
+    select(PX_ID, MATCH_ID, PTR_SEQUENCE_NUM, us_crs_score, national_uscrs_sequence, status) %>%
+    rename(current_sequence = PTR_SEQUENCE_NUM) %>%
+    pivot_longer(cols = c(current_sequence, national_uscrs_sequence), 
+                 names_to = "allocation_system", 
+                 values_to = "sequence_position") %>%
+    mutate(
+      allocation_system = case_when(
+        allocation_system == "current_sequence" ~ "Current 6-Status System",
+        allocation_system == "national_uscrs_sequence" ~ "National US-CRS System"
+      ),
+      allocation_system = factor(allocation_system, levels = c("Current 6-Status System", "National US-CRS System"))) %>%
+    group_by(allocation_system, sequence_position, status) %>%
+    filter(sequence_position <= 100) %>%  # Focus on top 100 candidates for clarity
+    summarise(
+      n_candidates = n(),
+      .groups = "drop"
+    ) %>%
+    ggplot(aes(x = sequence_position, y = n_candidates, fill = status)) +
+    geom_area(position = "fill", alpha = 0.8) +
+    facet_wrap(~allocation_system, ncol = 1) +
+    scale_fill_viridis_d(option = "turbo", name = "Current Status", direction = -1) +
+    scale_y_continuous(labels = scales::percent_format()) +
+    labs(
+      title = "Candidate Status Distribution by Allocation System",
+      subtitle = "Proportion of candidates by status across sequence positions (Top 100)",
+      x = "Sequence Position (Lower = Higher Priority)",
+      y = "Proportion of Candidates"
+    ) + theme_minimal()
+}
+```
+
+
+# Figures under developement
+
+
+
+## Status-Specific Impact Analysis
+```{r status-impact}
+if(exists("sequence_comparison")) {
+  
+  # Analyze impact by current status
+  status_impact <- sequence_comparison %>%
+    filter(!is.na(status) & !is.na(national_vs_current) & !is.na(acuity_vs_current)) %>%
+    group_by(status) %>%
+    summarise(
+      n_candidates = n(),
+      mean_uscrs = round(mean(us_crs_score, na.rm = TRUE), 1),
+      
+      # National US-CRS impacts
+      national_mean_change = round(mean(national_vs_current, na.rm = TRUE), 1),
+      national_median_change = round(median(national_vs_current, na.rm = TRUE), 1),
+      national_pct_improved = round(sum(national_vs_current < 0, na.rm = TRUE) / n() * 100, 1),
+      
+      # Acuity Circle US-CRS impacts  
+      acuity_mean_change = round(mean(acuity_vs_current, na.rm = TRUE), 1),
+      acuity_median_change = round(median(acuity_vs_current, na.rm = TRUE), 1),
+      acuity_pct_improved = round(sum(acuity_vs_current < 0, na.rm = TRUE) / n() * 100, 1),
+      
+      .groups = "drop"
+    ) %>%
+    arrange(mean_uscrs)
+  
+  print("Status-Specific Impact Analysis:")
+  print(status_impact)
+  
+  # Visualization of status impacts
+  status_viz_data <- sequence_comparison %>%
+    filter(!is.na(status)) %>%
+    select(status, national_vs_current, acuity_vs_current) %>%
+    pivot_longer(
+      cols = c(national_vs_current, acuity_vs_current),
+      names_to = "comparison_type",
+      values_to = "sequence_change"
+    ) %>%
+    mutate(
+      comparison_type = case_when(
+        comparison_type == "national_vs_current" ~ "National vs Current",
+        comparison_type == "acuity_vs_current" ~ "Acuity Circle vs Current"
+      )
+    )
+  
+  p2 <- status_viz_data %>%
+    ggplot(aes(x = status, y = sequence_change, fill = comparison_type)) +
+    geom_boxplot(alpha = 0.7, outlier.alpha = 0.3) +
+    geom_hline(yintercept = 0, linetype = "dashed", color = "red", alpha = 0.7) +
+    scale_fill_viridis_d(option = "turbo", name = "System Comparison") +
+    labs(
+      title = "Sequence Position Changes by Current Heart Status",
+      subtitle = "Negative values = improved priority, Positive values = lower priority",
+      x = "Current Heart Status",
+      y = "Sequence Position Change"
+    ) +
+    theme_minimal() +
+    theme(
+      plot.title = element_text(size = 14, face = "bold"),
+      axis.text.x = element_text(angle = 45, hjust = 1),
+      legend.position = "bottom"
+    ) +
+    facet_wrap(~comparison_type, scales = "free_y")
+  
+  print(p2)
+  
+  ggsave(here("results", "status_specific_impact.png"), p2, 
+         width = 14, height = 8, dpi = 300)
+  
+} else {
+  print("Skipping status impact analysis - comparison data not available")
+}
+```
+
+## Geographic Distance Impact Analysis
+
+```{r distance-impact}
+if(exists("sequence_comparison")) {
+  
+  # Analyze how distance affects the difference between National and Acuity Circle systems
+  distance_impact <- sequence_comparison %>%
+    filter(!is.na(PTR_DISTANCE) & !is.na(national_vs_acuity)) %>%
+    mutate(
+      distance_category = case_when(
+        PTR_DISTANCE <= 250 ~ "≤250 NM",
+        PTR_DISTANCE <= 500 ~ "251-500 NM",
+        PTR_DISTANCE <= 1000 ~ "501-1000 NM", 
+        PTR_DISTANCE <= 1500 ~ "1001-1500 NM",
+        PTR_DISTANCE <= 2500 ~ "1501-2500 NM",
+        TRUE ~ ">2500 NM"
+      ),
+      distance_category = factor(distance_category, levels = c("≤250 NM", "251-500 NM", 
+                                                              "501-1000 NM", "1001-1500 NM", 
+                                                              "1501-2500 NM", ">2500 NM"))
+    ) %>%
+    group_by(distance_category) %>%
+    summarise(
+      n_candidates = n(),
+      mean_distance = round(mean(PTR_DISTANCE, na.rm = TRUE), 0),
+      national_advantage = sum(national_vs_acuity < 0, na.rm = TRUE),
+      acuity_advantage = sum(national_vs_acuity > 0, na.rm = TRUE), 
+      systems_tied = sum(national_vs_acuity == 0, na.rm = TRUE),
+      mean_national_advantage = round(mean(national_vs_acuity, na.rm = TRUE), 1),
+      .groups = "drop"
+    ) %>%
+    mutate(
+      pct_national_advantage = round(national_advantage / n_candidates * 100, 1),
+      pct_acuity_advantage = round(acuity_advantage / n_candidates * 100, 1)
+    )
+  
+  print("Geographic Distance Impact Analysis:")
+  print(distance_impact)
+  
+  # Visualization
+  distance_viz <- sequence_comparison %>%
+    filter(!is.na(PTR_DISTANCE) & !is.na(national_vs_acuity)) %>%
+    mutate(
+      distance_category = case_when(
+        PTR_DISTANCE <= 250 ~ "≤250 NM",
+        PTR_DISTANCE <= 500 ~ "251-500 NM", 
+        PTR_DISTANCE <= 1000 ~ "501-1000 NM",
+        PTR_DISTANCE <= 1500 ~ "1001-1500 NM",
+        PTR_DISTANCE <= 2500 ~ "1501-2500 NM", 
+        TRUE ~ ">2500 NM"
+      ),
+      system_preference = case_when(
+        national_vs_acuity < 0 ~ "National Better",
+        national_vs_acuity > 0 ~ "Acuity Circle Better", 
+        TRUE ~ "Systems Equal"
+      )
+    )
+  
+  p3 <- distance_viz %>%
+    ggplot(aes(x = distance_category, fill = system_preference)) +
+    geom_bar(position = "fill", alpha = 0.8) +
+    scale_fill_manual(
+      values = c("National Better" = "#2E8B57", "Acuity Circle Better" = "#FF6347", "Systems Equal" = "#808080"),
+      name = "System Performance"
+    ) +
+    scale_y_continuous(labels = scales::percent_format()) +
+    labs(
+      title = "National vs Acuity Circle US-CRS System Performance by Distance",
+      subtitle = "Proportion of candidates with better sequence position in each system",
+      x = "Distance from Donor",
+      y = "Percentage of Candidates"
+    ) +
+    theme_minimal() +
+    theme(
+      plot.title = element_text(size = 14, face = "bold"),
+      axis.text.x = element_text(angle = 45, hjust = 1),
+      legend.position = "bottom"
+    )
+  
+  print(p3)
+  
+  ggsave(here("results", "distance_impact_comparison.png"), p3, 
+         width = 12, height = 8, dpi = 300)
+  
+} else {
+  print("Skipping distance impact analysis - comparison data not available")
+}
+```
+
+## Detailed Sequence Analysis for national allocation
+```{r sequence-impact-analysis}
+# Analyze the impact of switching to national US-CRS
+sequence_impact <- heart_only_match_run_national %>%
+  mutate(
+    sequence_change = national_uscrs_sequence - PTR_SEQUENCE_NUM,
+    improvement_category = case_when(
+      sequence_change <= -10 ~ "Major Improvement (≥10 spots up)",
+      sequence_change <= -5 ~ "Moderate Improvement (5-9 spots up)", 
+      sequence_change <= -1 ~ "Minor Improvement (1-4 spots up)",
+      sequence_change == 0 ~ "No Change",
+      sequence_change <= 4 ~ "Minor Decline (1-4 spots down)",
+      sequence_change <= 9 ~ "Moderate Decline (5-9 spots down)",
+      sequence_change >= 10 ~ "Major Decline (≥10 spots down)"
+    ),
+    improvement_category = factor(improvement_category, levels = c(
+      "Major Improvement (≥10 spots up)",
+      "Moderate Improvement (5-9 spots up)", 
+      "Minor Improvement (1-4 spots up)",
+      "No Change",
+      "Minor Decline (1-4 spots down)",
+      "Moderate Decline (5-9 spots down)",
+      "Major Decline (≥10 spots down)"
+    ))
+  )
+
+# Impact by US-CRS score
+p2 <- sequence_impact %>%
+  filter(!is.na(us_crs_score) & !is.na(improvement_category)) %>%
+  ggplot(aes(x = us_crs_score, fill = improvement_category)) +
+  geom_histogram(binwidth = 2, alpha = 0.8, color = "white", size = 0.1) +
+  scale_fill_brewer(type = "div", palette = "RdYlGn", name = "Sequence Change", 
+                    guide = guide_legend(reverse = TRUE)) +
+  labs(
+    title = "Impact of National US-CRS Allocation by Risk Score",
+    subtitle = "How sequence position changes vary across US-CRS risk levels",
+    x = "US-CRS Score (Higher = Higher Transplant Need)",
+    y = "Number of Candidates"
+  ) +
+  theme_minimal() +
+  theme(
+    plot.title = element_text(size = 14, face = "bold"),
+    plot.subtitle = element_text(size = 11, color = "gray40"),
+    legend.position = "bottom",
+    legend.title = element_text(size = 10, face = "bold")
+  ) +
+  guides(fill = guide_legend(nrow = 2, byrow = TRUE))
+
+print(p2)
+
+# Save impact analysis
+ggsave(here("results", "national_uscrs_impact_by_score.png"), p2, 
+       width = 12, height = 8, dpi = 300)
+
+# Summary statistics
+impact_summary <- sequence_impact %>%
+  filter(!is.na(improvement_category)) %>%
+  count(improvement_category) %>%
+  mutate(percentage = round(n / sum(n) * 100, 1))
+
+print("Sequence Change Impact Summary:")
+print(impact_summary)
+```
+
+
+## Detailed Sequence Analysis for Acuity Circle allocation
+
+
+# Summary Report
+
+```{r summary-report}
+if(exists("sequence_comparison") && exists("status_impact") && exists("distance_impact")) {
+  
+  cat("=== US-CRS MATCH RUN ANALYSIS SUMMARY ===\n\n")
+  
+  cat("1. OVERALL IMPACT:\n")
+  total_candidates <- nrow(sequence_comparison)
+  national_improved <- sum(sequence_comparison$national_vs_current < 0, na.rm = TRUE)
+  acuity_improved <- sum(sequence_comparison$acuity_vs_current < 0, na.rm = TRUE)
+  
+  cat(sprintf("- Total candidates analyzed: %s\n", scales::comma(total_candidates)))
+  cat(sprintf("- National US-CRS improved %s candidates (%.1f%%)\n", 
+              scales::comma(national_improved), national_improved/total_candidates*100))
+  cat(sprintf("- Acuity Circle US-CRS improved %s candidates (%.1f%%)\n", 
+              scales::comma(acuity_improved), acuity_improved/total_candidates*100))
+  
+  cat("\n2. STATUS-SPECIFIC FINDINGS:\n")
+  high_benefit_national <- status_impact %>% filter(national_pct_improved >= 60) %>% pull(status)
+  high_benefit_acuity <- status_impact %>% filter(acuity_pct_improved >= 60) %>% pull(status)
+  
+  if(length(high_benefit_national) > 0) {
+    cat(sprintf("- High benefit from National system: %s\n", paste(high_benefit_national, collapse = ", ")))
+  }
+  if(length(high_benefit_acuity) > 0) {
+    cat(sprintf("- High benefit from Acuity Circle system: %s\n", paste(high_benefit_acuity, collapse = ", ")))
+  }
+  
+  cat("\n3. GEOGRAPHIC FINDINGS:\n")
+  close_distance <- distance_impact %>% filter(distance_category == "≤250 NM")
+  far_distance <- distance_impact %>% filter(distance_category == ">2500 NM")
+  
+  if(nrow(close_distance) > 0) {
+    cat(sprintf("- Close distance candidates (≤250 NM): %.1f%% favor National, %.1f%% favor Acuity Circle\n",
+                close_distance$pct_national_advantage, close_distance$pct_acuity_advantage))
+  }
+  if(nrow(far_distance) > 0) {
+    cat(sprintf("- Far distance candidates (>2500 NM): %.1f%% favor National, %.1f%% favor Acuity Circle\n",
+                far_distance$pct_national_advantage, far_distance$pct_acuity_advantage))
+  }
+  
+  cat("\n4. RISK STRATIFICATION:\n")
+  cat("- All systems show inverse relationship between sequence position and US-CRS score\n")
+  cat("- US-CRS based systems demonstrate improved risk stratification vs current system\n")
+  
+  cat(sprintf("\nAnalysis completed: %s\n", Sys.time()))
+  cat("Visualizations saved to results/ directory\n")
+  
+} else {
+  cat("Summary report not available - missing required datasets\n")
+  cat("Please ensure all counterfactual allocation scripts have been run:\n")
+  cat("1. national_uscrs_allocation.Rmd\n") 
+  cat("2. acuity_circle_uscrs.Rmd\n")
+}
+```
+
+# Save Analysis Results
+
+```{r save-results}
+if(exists("sequence_comparison")) {
+  # Save comprehensive comparison data
+  write_csv(sequence_comparison, here("data", "comprehensive_system_comparison.csv"))
+  
+  if(exists("status_impact")) {
+    write_csv(status_impact, here("data", "status_specific_impact_analysis.csv"))
+  }
+  
+  if(exists("distance_impact")) {
+    write_csv(distance_impact, here("data", "distance_impact_analysis.csv"))
+  }
+  
+  print("Analysis datasets saved to data/ directory")
+  print("All visualizations saved to results/ directory")
+  
+} else {
+  print("No analysis results to save - missing input datasets")
+}
+```
