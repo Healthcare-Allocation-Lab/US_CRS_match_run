@@ -36,10 +36,6 @@ donor_deceased <- read_sas(donor_deceased_path)
 
 
 ```{r}
-match_run
-```
-
-```{r}
 heart_only_match_run <- match_run %>%
   select(DONOR_ID, MATCH_ID, MATCH_ORG, MATCH_SUBMIT_DT,
          PX_ID, PTR_SEQUENCE_NUM, PTR_STAT_CD, PTR_STAT_DT, PTR_DISTANCE,
@@ -203,7 +199,6 @@ us_crs_mapper <- function(patient_id, match_date){
 us_crs_mapper(heart_only_match_run$PX_ID[2], heart_only_match_run$MATCH_SUBMIT_DT[2])
 ```
 
-
 # Apply US-CRS mapping to the full match run dataset
 ```{r}
 # Load parallel processing library
@@ -233,11 +228,13 @@ heart_only_match_run_with_uscrs <- heart_only_match_run %>%
 plan(sequential)
 
 print("US-CRS mapping completed!")
+```
 
+
+```{r}
 # Check the results
 heart_only_match_run_with_uscrs %>%
-  select(PX_ID, MATCH_SUBMIT_DT, PTR_STAT_CD, status, us_crs_score) %>%
-  head(10)
+  select(PX_ID, MATCH_SUBMIT_DT, PTR_STAT_CD, status, us_crs_score) 
 ```
 
 ```{r uscrs-summary}
@@ -259,6 +256,66 @@ if(with_uscrs > 0) {
               max(heart_only_match_run_with_uscrs$us_crs_score, na.rm = TRUE)))
 }
 ```
+
+
+# Missing US-CRS score analysis and imputation
+
+## Pediatric candidate missingness should be 100%
+```{r}
+heart_only_match_run_with_uscrs %>%
+  filter(CAN_AGE_AT_LISTING<18) %>% 
+  summarise(pediatric_match_run_count = n(),
+    us_crs_missing_percentage = 100*mean(is.na(us_crs_score) == TRUE))
+```
+```{r}
+heart_only_match_run_with_uscrs %>%
+  filter(CAN_AGE_AT_LISTING>=18) %>% 
+  summarise(us_crs_missing_percentage = 100*mean(is.na(us_crs_score) == TRUE))
+```
+# Adult patients with a missing US CRS
+```{r}
+missing_adults_wo_uscrs <- heart_only_match_run_with_uscrs %>%
+  filter(CAN_AGE_AT_LISTING>=18 & is.na(us_crs_score)) 
+
+px_ids_missing_uscrs <- missing_adults_wo_uscrs %>% pull(PX_ID) %>% unique()
+
+#missing us_crs scores but in pred_data
+mapping_issue_missing_uscrs_px_ids <- pred_data %>%
+  filter(PX_ID %in% px_ids_missing_uscrs) %>%
+  pull(PX_ID) %>%
+  unique()
+
+length(mapping_issue_missing_uscrs_px_ids)
+```
+
+```{r}
+# PX_IDs missing from pred_data entirely
+missing_px_id_pred_data <- setdiff(px_ids_missing_uscrs, mapping_issue_missing_uscrs_px_ids)
+
+length(missing_px_id_pred_data)
+
+
+#export match run entries with missing us_crs_scores 
+missing_adults_wo_uscrs <- heart_only_match_run_with_uscrs %>%
+  filter(CAN_AGE_AT_LISTING>=18 & is.na(us_crs_score)) %>%
+  mutate(missing_reason = ifelse(PX_ID %in% missing_px_id_pred_data, "missing from pred_data", "PX_ID in pred_data, but did not map"))
+
+save(missing_adults_wo_uscrs, file = here("data", "adult_match_run_entries_missing_uscrs.Rdata"))
+```
+
+
+## impute `us_crs` of 25 for adults with missing score
+goal to remove this step after debugging
+```{r}
+heart_only_match_run_with_uscrs <- heart_only_match_run_with_uscrs %>%
+  mutate(us_crs_score = ifelse(is.na(us_crs_score) & CAN_AGE_AT_LISTING>=18, 25, us_crs_score))
+
+#check imputation successful
+heart_only_match_run_with_uscrs %>%
+  filter(CAN_AGE_AT_LISTING>=18 & is.na(us_crs_score)) %>%
+  count(CAN_AGE_AT_LISTING)
+```
+
 
 # Save processed data
 ```{r save-data}
