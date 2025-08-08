@@ -267,12 +267,31 @@ heart_only_match_run_with_uscrs %>%
   summarise(pediatric_match_run_count = n(),
     us_crs_missing_percentage = 100*mean(is.na(us_crs_score) == TRUE))
 ```
+
+
 ```{r}
 heart_only_match_run_with_uscrs %>%
   filter(CAN_AGE_AT_LISTING>=18) %>% 
   summarise(us_crs_missing_percentage = 100*mean(is.na(us_crs_score) == TRUE))
 ```
-# Adult patients with a missing US CRS
+## Adult candidates with a missing US CRS
+```{r}
+missing_uscrs_mr_rows <- heart_only_match_run_with_uscrs %>%
+  filter(CAN_AGE_AT_LISTING >= 18 & is.na(us_crs_score)) %>%
+  nrow()
+
+total_adult_mr_rows <- heart_only_match_run_with_uscrs %>%
+  filter(CAN_AGE_AT_LISTING >= 18) %>%
+  nrow()
+
+missing_uscrs_percentage <- (missing_uscrs_mr_rows / total_adult_mr_rows) * 100
+
+print(paste("Adult Match Run Records with Missing US-CRS Scores:"))
+print(paste("- Total adult records:", total_adult_mr_rows))
+print(paste("- Records with missing US-CRS scores:", missing_uscrs_mr_rows, "(", round(missing_uscrs_percentage, 1), "%)"))
+```
+
+
 ```{r}
 missing_adults_wo_uscrs <- heart_only_match_run_with_uscrs %>%
   filter(CAN_AGE_AT_LISTING>=18 & is.na(us_crs_score)) 
@@ -286,6 +305,8 @@ mapping_issue_missing_uscrs_px_ids <- pred_data %>%
   unique()
 
 length(mapping_issue_missing_uscrs_px_ids)
+
+print(paste("Number of unique PX_IDs with missing US-CRS scores but present in pred_data:", length(mapping_issue_missing_uscrs_px_ids)))
 ```
 
 ```{r}
@@ -294,6 +315,15 @@ missing_px_id_pred_data <- setdiff(px_ids_missing_uscrs, mapping_issue_missing_u
 
 length(missing_px_id_pred_data)
 
+print(paste("Number of unique PX_IDs with missing US-CRS scores and not present in pred_data:", length(missing_px_id_pred_data)))
+
+all_adult_pxids <- heart_only_match_run_with_uscrs %>%
+  filter(CAN_AGE_AT_LISTING>=18) %>%
+  pull(PX_ID) %>%
+  unique()
+
+print(paste("Proportion PX_IDs not in pred_data:", 
+            round(length(missing_px_id_pred_data) / length(all_adult_pxids) * 100, 1), "%"))
 
 #export match run entries with missing us_crs_scores 
 missing_adults_wo_uscrs <- heart_only_match_run_with_uscrs %>%
@@ -302,6 +332,9 @@ missing_adults_wo_uscrs <- heart_only_match_run_with_uscrs %>%
 
 save(missing_adults_wo_uscrs, file = here("data", "adult_match_run_entries_missing_uscrs.Rdata"))
 ```
+
+
+
 
 
 ## impute `us_crs` of 25 for adults with missing score
@@ -366,6 +399,7 @@ print("1. Run 'match_run_visualizations.Rmd' for analysis and visualization")
 print("2. Run 'counterfactual_mr.Rmd' for US-CRS based allocation simulation")
 print("3. Run 'national_uscrs_allocation.Rmd' for simplified national allocation")
 ```
+
 
 
 
