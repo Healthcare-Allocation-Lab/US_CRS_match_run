@@ -325,6 +325,15 @@ all_adult_pxids <- heart_only_match_run_with_uscrs %>%
 print(paste("Proportion PX_IDs not in pred_data:", 
             round(length(missing_px_id_pred_data) / length(all_adult_pxids) * 100, 1), "%"))
 
+
+# Count adult candidates with missing US-CRS scores by status
+missing_by_status <- heart_only_match_run_with_uscrs %>%
+  filter(CAN_AGE_AT_LISTING >= 18 & is.na(us_crs_score)) %>%
+  count(status, sort = TRUE, name = "n_missing")
+
+print("\\nAdult candidates with missing US-CRS scores by status:")
+print(missing_by_status)
+
 #export match run entries with missing us_crs_scores 
 missing_adults_wo_uscrs <- heart_only_match_run_with_uscrs %>%
   filter(CAN_AGE_AT_LISTING>=18 & is.na(us_crs_score)) %>%
@@ -335,20 +344,84 @@ save(missing_adults_wo_uscrs, file = here("data", "adult_match_run_entries_missi
 
 
 
-
-
-## impute `us_crs` of 25 for adults with missing score
+## impute US-CRS scores for adult candidates with missing scores based on status
 goal to remove this step after debugging
-```{r}
+```{r impute-missing-uscrs}
+# Calculate median US-CRS scores by status for adult candidates (age >= 18)
+median_uscrs_by_status <- heart_only_match_run_with_uscrs %>%
+  filter(CAN_AGE_AT_LISTING >= 18 & !is.na(us_crs_score)) %>%
+  group_by(status) %>%
+  summarise(
+    n_with_score = n(),
+    median_uscrs = median(us_crs_score, na.rm = TRUE),
+    mean_uscrs = round(mean(us_crs_score, na.rm = TRUE), 1),
+    q25_uscrs = quantile(us_crs_score, 0.25, na.rm = TRUE),
+    q75_uscrs = quantile(us_crs_score, 0.75, na.rm = TRUE),
+    .groups = "drop"
+  ) %>%
+  arrange(desc(median_uscrs))
+
+print("Median US-CRS scores by status (for imputation):")
+print(median_uscrs_by_status)
+
+
+# Perform imputation for adult candidates only
 heart_only_match_run_with_uscrs <- heart_only_match_run_with_uscrs %>%
-  mutate(us_crs_score = ifelse(is.na(us_crs_score) & CAN_AGE_AT_LISTING>=18, 25, us_crs_score))
+  left_join(
+    median_uscrs_by_status %>% select(status, median_uscrs),
+    by = "status"
+  ) %>%
+  mutate(
+    us_crs_score_imputed = case_when(
+      # Keep original scores for all candidates with existing US-CRS scores
+      !is.na(us_crs_score) ~ us_crs_score,
+      # Keep NA for pediatric candidates (age < 18) - don't impute
+      CAN_AGE_AT_LISTING < 18 ~ NA_real_,
+      # Impute for adult candidates with missing scores using median by status
+      CAN_AGE_AT_LISTING >= 18 & is.na(us_crs_score) & !is.na(median_uscrs) ~ median_uscrs,
+      # Keep NA if no median available for that status
+      TRUE ~ NA_real_
+    ),
+    imputation_flag = case_when(
+      CAN_AGE_AT_LISTING < 18 ~ "pediatric_no_imputation",
+      !is.na(us_crs_score) ~ "original_score",
+      CAN_AGE_AT_LISTING >= 18 & is.na(us_crs_score) & !is.na(median_uscrs) ~ "imputed_from_status_median",
+      TRUE ~ "no_imputation_possible"
+    )
+  ) %>%
+  select(-median_uscrs) # Remove temporary join column
 
-#check imputation successful
-heart_only_match_run_with_uscrs %>%
-  filter(CAN_AGE_AT_LISTING>=18 & is.na(us_crs_score)) %>%
-  count(CAN_AGE_AT_LISTING)
+# Summary of imputation results
+imputation_summary <- heart_only_match_run_with_uscrs %>%
+  count(imputation_flag) %>%
+  mutate(percentage = round(n / sum(n) * 100, 1))
+
+print("\\n=== IMPUTATION SUMMARY ===")
+print(imputation_summary)
+
+# Before and after comparison
+before_missing <- sum(is.na(heart_only_match_run_with_uscrs$us_crs_score))
+after_missing <- sum(is.na(heart_only_match_run_with_uscrs$us_crs_score_imputed))
+
+adult_records <- sum(heart_only_match_run_with_uscrs$CAN_AGE_AT_LISTING >= 18)
+adult_imputed <- sum(heart_only_match_run_with_uscrs$imputation_flag == "imputed_from_status_median", na.rm = TRUE)
+
+cat("\\n=== BEFORE/AFTER COMPARISON ===\\n")
+cat("Total records:", nrow(heart_only_match_run_with_uscrs), "\\n")
+cat("Adult records (age >= 18):", adult_records, "\\n")
+cat("Missing US-CRS before imputation:", before_missing, "\\n")
+cat("Missing US-CRS after imputation:", after_missing, "\\n")
+cat("Adult records imputed:", adult_imputed, "\\n")
+cat("Imputation success rate for adults:", round(adult_imputed / (before_missing - sum(heart_only_match_run_with_uscrs$CAN_AGE_AT_LISTING < 18 & is.na(heart_only_match_run_with_uscrs$us_crs_score))) * 100, 1), "%\\n")
+
+# Replace the original us_crs_score with imputed version
+heart_only_match_run_with_uscrs <- heart_only_match_run_with_uscrs %>%
+  select(-us_crs_score) %>%
+  rename(us_crs_score = us_crs_score_imputed)
+
+print("\\nImputation completed! Original us_crs_score column updated with imputed values.")
+print("Imputation applied only to adult candidates (age >= 18) using median US-CRS by status.")
 ```
-
 
 # Save processed data
 ```{r save-data}
