@@ -343,16 +343,6 @@ save(missing_adults_wo_uscrs, file = here("data", "adult_match_run_entries_missi
 ```
 
 
-
-## drop match run entries with missing US-CRS scores
-
-will plan on updating
-```{r}
-heart_only_match_run_with_uscrs <- heart_only_match_run_with_uscrs %>%
-  filter(CAN_AGE_AT_LISTING >= 18 & is.na(us_crs_score) == FALSE)
-```
-
-
 # Save processed data
 ```{r save-data}
 # Display final dataset structure
