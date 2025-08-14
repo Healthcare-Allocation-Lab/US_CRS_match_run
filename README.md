@@ -27,7 +27,7 @@ The proposed allocation replaces the adult therapy-based statuses with categorie
 | Status 5 | 10-18 | Lower priority |
 | Status 6 | 0-9 | Lowest priority |
 
-This match run analysis implements a ![national](national_uscrs_allocation.md) and ![acuity ring](acuity_ring_uscrs_allocation.md) allocation policy, maintaing the current ![blood type compatibility rules](references/blood_type_matching_requirements.png). Ties within US-CRS status are broken by US-CRS score, then waiting time.
+This match run analysis implements a [national](national_uscrs_allocation.md) and [acuity ring](acuity_ring_uscrs_allocation.md) allocation policy, maintaing the current [blood type compatibility rules](references/blood_type_matching_requirements.png). Ties within US-CRS status are broken by US-CRS score, then waiting time.
 
 ## Required Data Files
 
