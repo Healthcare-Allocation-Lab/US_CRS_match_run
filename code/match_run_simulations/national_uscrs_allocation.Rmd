@@ -229,8 +229,7 @@ calculate_national_uscrs_sequence <- function(classified_data) {
     arrange(
       national_uscrs_classification,           # Primary: Classification (lower = higher priority)
       desc(us_crs_score),                     # Secondary: Higher US-CRS score within class
-      desc(1 - prob_surv_6wk),                # Tertiary: Lower survival probability (higher risk)
-      desc(waiting_time_days)                 # Quaternary: Longer waiting time
+      desc(waiting_time_days)                 # Terteriary: Longer waiting time
     ) %>%
     mutate(
       national_uscrs_sequence = row_number()  # New sequence based on national US-CRS allocation
@@ -317,8 +316,6 @@ national_sequence_summary <- national_sequence_comparison %>%
 print(national_sequence_summary)
 ```
 
-
-
 # Detailed Sequence Analysis
 ```{r sequence-impact-analysis}
 # Analyze the impact of switching to national US-CRS
@@ -382,6 +379,14 @@ impact_summary <- sequence_impact %>%
 print("Sequence Change Impact Summary:")
 print(impact_summary)
 ```
+```{r}
+heart_only_match_run_with_uscrs %>%
+  ggplot(aes(x = us_crs_score, fill = status)) + 
+  geom_histogram(breaks = seq(0,50), alpha = 0.7, color = "white", size = 0.1)
+```
+
+
+
 
 # Status-Specific Analysis
 ```{r status-comparison}
@@ -447,15 +452,20 @@ heart_only_match_run_national %>%
     ),
     allocation_system = factor(allocation_system, levels = c("Current 6-Status System", "National US-CRS System"))
   ) %>%
-  filter(sequence_position <= 200) %>%  # Focus on top 100 candidates for clarity
+  filter(sequence_position <= 300) %>%  # Focus on top 100 candidates for clarity
   group_by(allocation_system, sequence_position) %>%
   summarise(
     mean_us_crs = mean(us_crs_score, na.rm = TRUE),
     median_us_crs = median(us_crs_score, na.rm = TRUE),
+    sd_us_crs = sd(us_crs_score, na.rm = TRUE),
     n_candidates = n(),
+    se_us_crs = sd_us_crs / sqrt(n_candidates),
+    ci_lower = mean_us_crs - (1.96 * se_us_crs),
+    ci_upper = mean_us_crs + (1.96 * se_us_crs),
     .groups = "drop"
   ) %>%
-  ggplot(aes(x = sequence_position, y = mean_us_crs, color = allocation_system)) +
+  ggplot(aes(x = sequence_position, y = mean_us_crs, color = allocation_system, fill = allocation_system)) +
+  geom_ribbon(aes(ymin = ci_lower, ymax = ci_upper), alpha = 0.2, color = NA) +
   geom_line(size = 1) +
   geom_point(alpha = 0.7) +
   labs(
@@ -471,6 +481,9 @@ heart_only_match_run_national %>%
     legend.position = "right"
   )
 ```
+
+
+
 
 
 # Save National Allocation Results

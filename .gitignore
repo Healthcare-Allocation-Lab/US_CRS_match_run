@@ -19,11 +19,14 @@ renv/sandbox/
 renv/staging/
 .Rprofile.local
 
+
+# ignore data files
+data/*
+
 # Ignore large result files
-results/*.pdf
+results/*
 
 # Ignore screenshots folder
 screenshots/
 
-# Ignore goal_datastructure (temporary)
-goal_datastructure/
+results/individual_match_run_examples/

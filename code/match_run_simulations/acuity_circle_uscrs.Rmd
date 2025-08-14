@@ -673,12 +673,10 @@ assign_uscrs_classification <- function(match_data) {
            blood_compatibility == "primary" & distance_category == "Nation" ~ "p101",
           candidate_age_category == "adult" & uscrs_status_numeric == 6 & 
            blood_compatibility == "secondary" & distance_category == "Nation" ~ "p102",
-          
-          # Class 171-172: Final fallback for any remaining edge cases
-          TRUE ~ "p103"
+          TRUE ~ "p999" # Should not reach here if logic is complete
         ),
         
-        TRUE ~ "p999" # Should not reach here if logic is complete
+        TRUE ~ "unclassified"
       )
     )
 }
@@ -700,8 +698,7 @@ calculate_uscrs_sequence <- function(classified_data) {
     arrange(
       us_crs_classification,                    # Primary: Classification (lower = higher priority)
       desc(us_crs_score),                      # Secondary: Higher US-CRS score within class
-      desc(1 - prob_surv_6wk),                 # Tertiary: Lower survival probability (higher risk)
-      desc(waiting_time_days)                  # Quaternary: Longer waiting time
+      desc(waiting_time_days)                  # Tertiary: Longer waiting time
     ) %>%
     mutate(
       us_crs_sequence = row_number()           # New sequence based on US-CRS allocation

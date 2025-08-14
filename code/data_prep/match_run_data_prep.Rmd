@@ -258,7 +258,7 @@ if(with_uscrs > 0) {
 ```
 
 
-# Missing US-CRS score analysis and imputation
+# Missing US-CRS score analysis
 
 ## Pediatric candidate missingness should be 100%
 ```{r}
