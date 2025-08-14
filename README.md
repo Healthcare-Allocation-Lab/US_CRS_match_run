@@ -16,7 +16,7 @@ There is wide heterogenity of patient risk within each status
 ![US-CRS distribution by status](references/US_CRS_distribution.png)
 
 
-The proposed allocation replaces the adult therapy-based statuses with continuous US-CRS scores:
+The proposed allocation replaces the adult therapy-based statuses with categories of risk based on US-CRS scores:
 
 | Status | US-CRS Range | Description |
 |--------|-------------|-------------|
@@ -26,6 +26,8 @@ The proposed allocation replaces the adult therapy-based statuses with continuou
 | Status 4 | 20-28 | Moderate priority |
 | Status 5 | 10-18 | Lower priority |
 | Status 6 | 0-9 | Lowest priority |
+
+This match run analysis implements a ![national](national_uscrs_allocation.md) and ![acuity ring](acuity_ring_uscrs_allocation.md) allocation policy, maintaing the current ![blood type compatibility rules](references/blood_type_matching_requirements.png). Ties within US-CRS status are broken by US-CRS score, then waiting time.
 
 ## Required Data Files
 
