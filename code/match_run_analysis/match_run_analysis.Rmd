@@ -70,46 +70,75 @@ data_summary <- tibble(
   Available = c(TRUE, exists("heart_only_match_run_national"), exists("heart_only_match_run_counterfactual"))
 )
 
-print("Dataset Summary:")
-print(data_summary)
+data_summary
+```
 
-# Basic US-CRS score statistics across all systems
-if(exists("heart_only_match_run_national") && exists("heart_only_match_run_counterfactual")) {
-  us_crs_summary <- heart_only_match_run_with_uscrs %>%
-    filter(!is.na(us_crs_score)) %>%
-    summarise(
-      n_records = n(),
-      mean_uscrs = round(mean(us_crs_score), 1),
-      median_uscrs = round(median(us_crs_score), 1),
-      sd_uscrs = round(sd(us_crs_score), 1),
-      min_uscrs = round(min(us_crs_score), 1),
-      max_uscrs = round(max(us_crs_score), 1)
-    )
+
+```{r}
+status_color_palette <- c("Status 1" = "#D23105FF",
+                                  "Status 1A (pediatric)" = "#7A0403FF",
+                                  "Status 1B (pediatric)" = "#EDD03AFF",
+                                  "Status 2" = "#FB8022FF",
+                                  "Status 2 (pediatric)" = "#466BE3FF",
+                                  "Status 3" = "#A2FC3CFF",
+                                  "Status 4" = "#31F299FF",
+                                  "Status 5" = "#28BBECFF",
+                                  "Status 6" = "#30123BFF")
+```
+
+
+## distribution of US-CRS scores by status
+```{r}
+if(exists("heart_only_match_run_with_uscrs")) {
   
-  print("US-CRS Score Distribution:")
-  print(us_crs_summary)
+  # Create a distribution plot of US-CRS scores by status
+  us_crs_distribution <- heart_only_match_run_with_uscrs %>%
+    filter(!is.na(us_crs_score)) %>%
+    filter(status != "Status 1A (pediatric)" & status != "Status 1B (pediatric)") %>%
+    ggplot(aes(x = us_crs_score, fill = status)) +
+    geom_histogram(alpha = 0.6, breaks = seq(-0.5, 50.5,2)) +
+    scale_color_manual(values = status_color_palette) +
+    labs(
+      title = "Distribution of US-CRS Scores by Current Heart Status",
+      x = "US-CRS Score",
+      y = "Number of candidates"
+    ) +
+    theme_minimal() +
+    theme(
+      plot.title = element_text(size = 14, face = "bold"),
+      legend.position = "right"
+    ) + facet_wrap(~status, scales = "free_y") 
+  
+  print(us_crs_distribution)
+  
+  # Save the distribution plot
+  ggsave(here("results", "us_crs_score_distribution_by_status.png"), us_crs_distribution, 
+         width = 10, height = 6, dpi = 300)
+  
+} else {
+  cat("US-CRS score distribution plot requires heart_only_match_run_with_uscrs dataset\\n")
 }
 ```
 
 # System-to-System Sequence Comparison
 ```{r sequence-comparison}
+
+
 # Only proceed if all datasets are available
 if(exists("heart_only_match_run_national") && exists("heart_only_match_run_counterfactual")) {
   
   # Create comprehensive comparison dataset
   sequence_comparison <- heart_only_match_run_with_uscrs %>%
-    select(PX_ID, MATCH_ID, PTR_SEQUENCE_NUM, us_crs_score, status, 
-           PTR_DISTANCE, CAN_ABO, DON_ABO) %>%
     # Add National US-CRS sequence
     left_join(
       heart_only_match_run_national %>% 
-        select(PX_ID, MATCH_ID, national_uscrs_sequence),
+        select(PX_ID, MATCH_ID, national_uscrs_sequence, national_uscrs_classification),
       by = c("PX_ID", "MATCH_ID")
     ) %>%
     # Add Acuity Circle US-CRS sequence  
     left_join(
       heart_only_match_run_counterfactual %>% 
-        select(PX_ID, MATCH_ID, us_crs_sequence),
+        select(PX_ID, MATCH_ID, us_crs_sequence, acuity_uscrs_classification = us_crs_classification),
       by = c("PX_ID", "MATCH_ID")
     ) %>%
     rename(
@@ -154,7 +183,243 @@ if(exists("heart_only_match_run_national") && exists("heart_only_match_run_count
 }
 ```
 
-# Visualization: Sequence Position Comparison
+# INDIVIDUAL MATCH RUN ANALYSIS
+
+## General match run visualization function
+```{r}
+# Visualize match run for a specific match ID colored by US-CRS score
+visualize_match_run <- function(match_id, 
+                                policy = "acuity-us-crs",
+                                match_data = sequence_comparison,
+                                    show_us_crs = TRUE,
+                                    sequence_limit = 300) {
+  
+  # Get match run information
+  match_info <- match_data %>%
+    filter(MATCH_ID == match_id) %>%
+    select(DONOR_ID, DON_ABO, MATCH_SUBMIT_DT) %>%
+    distinct()
+  
+  if(nrow(match_info) == 0) {
+    stop("Match ID not found in dataset")
+  }
+  
+  donor_id <- match_info$DONOR_ID
+  donor_blood_type <- match_info$DON_ABO
+  match_date <- match_info$MATCH_SUBMIT_DT
+  
+
+  # Get recipient distance for the rectangle
+  recipient_distance <- match_data %>%
+    filter(is.na(REC_TX_DT) == FALSE & MATCH_ID == match_id) %>%
+    pull(PTR_DISTANCE)
+  
+
+  
+  
+  if (policy == "current"){
+    match_data <- match_data %>%
+      mutate(sequence = current_sequence)
+  } else if (policy == "national-us-crs"){
+    match_data <- match_data %>%
+      mutate(sequence = national_sequence)
+  } else if (policy == "acuity-us-crs"){
+    match_data <- match_data %>%
+      mutate(sequence = acuity_sequence)
+  } else {
+    stop("Invalid policy specified. Use 'current', 
+         'national-us-crs', or 'acuity-us-crs'.")
+  }
+  
+    # Get the actual recipient sequence number as numeric value
+  tx_seq_number <- match_data %>%
+    filter(is.na(REC_TX_DT) == FALSE & MATCH_ID == match_id) %>%
+    pull(sequence)
+  
+  original_tx_seq_number <- match_data %>%
+    filter(is.na(REC_TX_DT) == FALSE & MATCH_ID == match_id) %>%
+    pull(current_sequence)
+  
+    if(length(tx_seq_number) == 0 || is.na(tx_seq_number)) {
+     outcome <- "Not utilized"
+  } else {
+     outcome <- paste("Recipient at sequence:", tx_seq_number, "\nDistance:", recipient_distance, "NM")
+  }
+  
+  # Greyscale for US-CRS, ordered colors for status urgency
+    if (show_us_crs){
+      p <- match_data %>% filter(MATCH_ID == match_id) %>%
+        ggplot(aes(x = sequence, y = PTR_DISTANCE, 
+               fill = us_crs_score, color = status)) +
+            scale_fill_gradient(low = "white", 
+                                high = "black", na.value = "grey90", 
+                        name = "US-CRS Score")
+    } else{
+      p <- match_data %>% filter(MATCH_ID == match_id) %>%
+        ggplot(aes(x = sequence, y = PTR_DISTANCE, 
+               color = status))
+    }
+  
+  p <- p + geom_point(shape = 21, size = 2, alpha = 0.8, stroke = 1) + 
+    scale_color_manual(values = status_color_palette,
+                       name = "Current Status") + 
+    labs(x = "Sequence Number", y = "Distance (NM)", 
+         fill = "US-CRS Score", color = "Heart Status", linetype = "Recipient", shape = "Candidate blood type") +
+    ggtitle(paste0("Match ID: ", match_id, " | Donor: ", donor_id, " (", donor_blood_type, ") | ", outcome)) +
+    theme_minimal()
+    
+
+  # Add vertical line and rectangle only if there was a transplant
+  if(length(tx_seq_number) > 0 && !is.na(tx_seq_number)) {
+    p <- p + 
+      geom_rect(
+        xmin = tx_seq_number - 2,
+        xmax = tx_seq_number + 2,
+        ymin = recipient_distance - 25,
+        ymax = recipient_distance + 25,
+        fill = NA,
+        color = "red",
+        linewidth = 1
+      ) + 
+      scale_linetype_manual(values = "dashed")
+  }
+  
+  return(p)
+}
+```
+
+```{r }
+# Visualize a specific match run with US-CRS scores
+sample_match_id <- heart_only_match_run_counterfactual$MATCH_ID[5]  
+
+visualize_match_run(sample_match_id, policy = "current", show_us_crs = FALSE)
+
+ggsave(here("results", "status_quo_example.pdf"))
+```
+
+```{r }
+visualize_match_run(sample_match_id, policy = "current", show_us_crs = TRUE)
+
+ggsave(here("results", "status_quo_example_with_uscrs.pdf"))
+```
+
+```{r }
+visualize_match_run(sample_match_id, policy = "current", show_us_crs = TRUE) + lims(x = c(0, 100))
+
+ggsave(here("results", "status_quo_example_with_uscrs_zoomed_in.pdf"))
+```
+
+## National US-CRS allocation for a single match run
+```{r}
+visualize_match_run(sample_match_id, policy = "national-us-crs", 
+                    show_us_crs = TRUE)
+
+ggsave(here("results", "national_uscrs_example.pdf"))
+```
+```{r}
+visualize_match_run(sample_match_id, policy = "national-us-crs", 
+                    show_us_crs = TRUE) + lims(x = c(0, 100))
+
+ggsave(here("results", "national_uscrs_example_first_100.pdf"))
+```
+## Acuity circle US-CRS allocation for a single match run
+```{r}
+visualize_match_run(sample_match_id, policy = "acuity-us-crs", 
+                    show_us_crs = TRUE)
+
+ggsave(here("results", "acuity_uscrs_example.pdf"))
+```
+```{r}
+visualize_match_run(sample_match_id, policy = "acuity-us-crs", 
+                    show_us_crs = TRUE) + lims(x = c(0, 100))
+
+ggsave(here("results", "acuity_uscrs_example_first_100.pdf"))
+```
+
+## Sequence shift plot
+
+```{r}
+plot_seqence_shifts <- function(match_id, policy = "acuity-us-crs"){
+  
+  recipient_PX_ID <- sequence_comparison %>%
+    filter(is.na(REC_TX_DT) == FALSE & MATCH_ID == match_id) %>%
+    pull(PX_ID) %>% unique()
+  
+  match_data <- sequence_comparison %>%
+    filter(MATCH_ID == match_id)
+  if (policy == "national-us-crs"){
+    match_data <- match_data %>%
+      select(PX_ID, national_sequence, current_sequence, us_crs_score) %>%
+      mutate(sequence_change = national_sequence - current_sequence) %>%
+      pivot_longer(
+      cols = c(current_sequence, national_sequence),
+      names_to = "allocation_system",
+      values_to = "sequence_position"
+    ) %>%
+      mutate(allocation_system = factor(allocation_system, levels = c("current_sequence", "national_sequence"),
+                                        labels = c("Current 6-Status", "National US-CRS")))
+  } else if (policy == "acuity-us-crs"){
+      match_data <- match_data %>%
+        select(PX_ID, acuity_sequence, current_sequence, us_crs_score) %>%
+        mutate(sequence_change = acuity_sequence - current_sequence) %>%
+        pivot_longer(
+          cols = c(current_sequence, acuity_sequence),
+          names_to = "allocation_system",
+          values_to = "sequence_position"
+        )  %>%
+        mutate(allocation_system = factor(allocation_system, levels = c("current_sequence", "acuity_sequence"),
+                                        labels = c("Current 6-Status", "Acuity Circle US-CRS")))
+  } else {
+    stop("Invalid policy specified. Use 
+         'national-us-crs', or 'acuity-us-crs'.")
+  }
+  
+  match_data %>%
+    ggplot(aes(y = allocation_system, x = sequence_position, 
+               color = us_crs_score, group = PX_ID)) +
+    geom_line(alpha = 0.5) + 
+    scale_color_gradient(low = "white", 
+                                high = "black", na.value = "grey90", 
+                        name = "US-CRS Score") +
+    labs(
+      title = paste("Sequence Position Changes for Match ID:", match_id),
+      subtitle = paste("Comparison of Current vs Acuity Circle US-CRS Sequence Positions"), 
+      y = "Allocation System",
+      x = "Sequence Position (Lower = Higher Priority)",
+      color = "Sequence Change"
+    ) +
+    theme_minimal()
+    
+}
+
+plot_seqence_shifts(sample_match_id)
+```
+
+## check high US-CRS score patients that dropped
+```{r}
+sequence_comparison %>%
+  filter(MATCH_ID == sample_match_id) %>%
+  mutate(acuity_change = acuity_sequence - current_sequence) %>%
+  filter(is.na(us_crs_score) == FALSE) %>%
+  ggplot(aes(x = us_crs_score, y = acuity_change)) +
+  geom_point(alpha = 0.5)
+```
+
+
+## Investigate high US-CRS score patients that dropped in sequence
+```{r}
+sequence_comparison %>%
+  filter(MATCH_ID == sample_match_id) %>%
+  mutate(acuity_change = acuity_sequence - current_sequence) %>%
+  filter(us_crs_score == 50 & acuity_change > 0) %>%
+  select(status, CAN_ABO, DON_ABO, PTR_DISTANCE, PTR_CLASS_ALLOC_CAT, current_sequence, acuity_sequence, acuity_uscrs_classification)
+```
+
+
+# NATIONAL ALLOCATION 
+
+
+## Visualization: Sequence Position Comparison
 ```{r sequence-viz}
 if(exists("sequence_comparison")) {
   
@@ -309,8 +574,7 @@ if(exists("sequence_comparison")) {
     ggplot(aes(x = sequence_position, y = n_candidates, fill = status)) +
     geom_area(position = "fill", alpha = 0.8) +
     facet_wrap(~allocation_system, ncol = 1) +
-    scale_fill_viridis_d(option = "turbo", direction = -1, 
-                      name = "Current Status") +
+    scale_fill_manual(values = status_color_palette) +
     scale_y_continuous(labels = scales::percent_format()) +
     labs(
       title = "Candidate Status Distribution by Allocation System",
@@ -321,1089 +585,120 @@ if(exists("sequence_comparison")) {
 }
 
 
-#
-
-
 
 ggsave(here("results", "status_distribution_fallback.pdf"))
 ```
 
-
-# Individual Match Run Visualizations
-
-## Match run visualization with US-CRS scores
-```{r visualize-mr-uscrs}
-# Visualize match run for a specific match ID colored by US-CRS score
-visualize_mr_with_uscrs <- function(match_id, match_data =
-                                      heart_only_match_run_with_uscrs, 
-                                    show_us_crs = TRUE,
-                                    sequence_limit = 300) {
-  # Get match run information
-  match_info <- match_data %>%
-    filter(MATCH_ID == match_id) %>%
-    select(DONOR_ID, DON_ABO, MATCH_SUBMIT_DT) %>%
-    distinct()
-  
-  if(nrow(match_info) == 0) {
-    stop("Match ID not found in dataset")
-  }
-  
-  donor_id <- match_info$DONOR_ID
-  donor_blood_type <- match_info$DON_ABO
-  match_date <- match_info$MATCH_SUBMIT_DT
-  
-  # Get the actual recipient sequence number as numeric value
-  tx_seq_number <- match_data %>%
-    filter(is.na(REC_TX_DT) == FALSE & MATCH_ID == match_id) %>%
-    pull(PTR_SEQUENCE_NUM)
-  
-  # Get recipient distance for the rectangle
-  recipient_distance <- match_data %>%
-    filter(is.na(REC_TX_DT) == FALSE & MATCH_ID == match_id) %>%
-    pull(PTR_DISTANCE)
-  
-  if(length(tx_seq_number) == 0 || is.na(tx_seq_number)) {
-     outcome <- "Not utilized"
-  } else {
-     outcome <- paste("Recipient at sequence:", tx_seq_number, "\nDistance:", recipient_distance, "NM")
-  }
-  
-  
-  # Greyscale for US-CRS, ordered colors for status urgency
-    if (show_us_crs){
-      p <- match_data %>% filter(MATCH_ID == match_id) %>%
-        ggplot(aes(x = PTR_SEQUENCE_NUM, y = PTR_DISTANCE, 
-               fill = us_crs_score, color = status)) +
-            scale_fill_gradient(low = "white", high = "black", na.value = "grey90", 
-                        name = "US-CRS Score")
-    } else{
-      p <- match_data %>% filter(MATCH_ID == match_id) %>%
-        ggplot(aes(x = PTR_SEQUENCE_NUM, y = PTR_DISTANCE, 
-               color = status))
-    }
-  
-  p <- p + geom_point(shape = 21, size = 2, alpha = 0.8, stroke = 1) + 
-    scale_color_manual(values = c("Status 1" = "#D23105FF",
-                                  "Status 1A (pediatric)" = "#7A0403FF",
-                                  "Status 1B (pediatric)" = "#EDD03AFF",
-                                  "Status 2" = "#FB8022FF",
-                                  "Status 2 (pediatric)" = "#466BE3FF",
-                                  "Status 3" = "#A2FC3CFF",
-                                  "Status 4" = "#31F299FF",
-                                  "Status 5" = "#28BBECFF",
-                                  "Status 6" = "#30123BFF"),
-                       name = "Current Status") + 
-    labs(x = "Sequence Number", y = "Distance (NM)", 
-         fill = "US-CRS Score", color = "Heart Status", linetype = "Recipient", shape = "Candidate blood type") +
-    ggtitle(paste0("Match ID: ", match_id, " | Donor: ", donor_id, " (", donor_blood_type, ") | ", outcome)) +
-    theme_minimal()
-    
-
-  # Add vertical line and rectangle only if there was a transplant
-  if(length(tx_seq_number) > 0 && !is.na(tx_seq_number)) {
-    p <- p + 
-      geom_rect(
-        xmin = tx_seq_number - 2,
-        xmax = tx_seq_number + 2,
-        ymin = recipient_distance - 25,
-        ymax = recipient_distance + 25,
-        fill = NA,
-        color = "red",
-        linewidth = 1
-      ) + 
-      scale_linetype_manual(values = "dashed")
-  }
-  
-  return(p)
-}
-
-#example usage
-```
-
-
-```{r }
-# Visualize a specific match run with US-CRS scores
-sample_match_id <- heart_only_match_run_counterfactual$MATCH_ID[5]  
-
-visualize_mr_with_uscrs(sample_match_id, show_us_crs = FALSE)
-
-ggsave(here("results", "status_quo_example.pdf"))
-```
-
-```{r }
-visualize_mr_with_uscrs(sample_match_id, show_us_crs = TRUE)
-
-ggsave(here("results", "status_quo_example_with_uscrs.pdf"))
-```
-
-```{r }
-visualize_mr_with_uscrs(sample_match_id, show_us_crs = TRUE) + lims(x = c(0, 100))
-
-ggsave(here("results", "status_quo_example_with_uscrs_zoomed_in.pdf"))
-```
-
-# visualize national US-CRS allocation for a single match run
-
-```{r visualize-national-uscrs}
-# Function to visualize national US-CRS allocation for a single match run
-visualize_national_uscrs <- function(match_id, match_data = heart_only_match_run_national, 
-                                    show_us_crs = TRUE,
-                                    sequence_limit = 300) {
-  
-  # Check if national data is available
-  if(!exists("heart_only_match_run_national")) {
-    stop("National US-CRS data not available. Please run national_uscrs_allocation.Rmd first.")
-  }
-  
-  # Get match run information
-  match_info <- match_data %>%
-    filter(MATCH_ID == match_id) %>%
-    select(DONOR_ID, DON_ABO, MATCH_SUBMIT_DT) %>%
-    distinct()
-  
-  if(nrow(match_info) == 0) {
-    stop("Match ID not found in national US-CRS dataset")
-  }
-  
-  donor_id <- match_info$DONOR_ID
-  donor_blood_type <- match_info$DON_ABO
-  match_date <- match_info$MATCH_SUBMIT_DT
-  
-  # Get the actual recipient sequence number as numeric value
-  tx_seq_number <- match_data %>%
-    filter(is.na(REC_TX_DT) == FALSE & MATCH_ID == match_id) %>%
-    pull(national_uscrs_sequence)
-  
-  # Get recipient distance for the rectangle
-  recipient_distance <- match_data %>%
-    filter(is.na(REC_TX_DT) == FALSE & MATCH_ID == match_id) %>%
-    pull(PTR_DISTANCE)
-  
-  if(length(tx_seq_number) == 0 || is.na(tx_seq_number)) {
-     outcome <- "Not utilized"
-  } else {
-     outcome <- paste("Recipient at sequence:", tx_seq_number, "\nDistance:", recipient_distance, "NM")
-  }
-  
-  # Greyscale for US-CRS, ordered colors for status urgency
-  if (show_us_crs){
-    p <- match_data %>% filter(MATCH_ID == match_id) %>%
-      ggplot(aes(x = national_uscrs_sequence, y = PTR_DISTANCE, 
-             fill = us_crs_score, color = status)) +
-          scale_fill_gradient(low = "white", high = "black", na.value = "grey90", 
-                      name = "US-CRS Score")
-  } else{
-    p <- match_data %>% filter(MATCH_ID == match_id) %>%
-      ggplot(aes(x = national_uscrs_sequence, y = PTR_DISTANCE, 
-             color = status))
-  }
-  
-  p <- p + geom_point(shape = 21, size = 2, alpha = 0.8, stroke = 1) + 
-    scale_color_manual(values = c("Status 1" = "#D23105FF",
-                                  "Status 1A (pediatric)" = "#7A0403FF",
-                                  "Status 1B (pediatric)" = "#EDD03AFF",
-                                  "Status 2" = "#FB8022FF",
-                                  "Status 2 (pediatric)" = "#466BE3FF",
-                                  "Status 3" = "#A2FC3CFF",
-                                  "Status 4" = "#31F299FF",
-                                  "Status 5" = "#28BBECFF",
-                                  "Status 6" = "#30123BFF"),
-                       name = "Current Status") + 
-    labs(x = "Sequence Number", y = "Distance (NM)", 
-         fill = "US-CRS Score", color = "Heart Status", linetype = "Recipient", shape = "Candidate blood type") +
-    ggtitle(paste0("Match ID: ", match_id, " | Donor: ", donor_id, " (", donor_blood_type, ") | ", outcome)) +
-    theme_minimal()
-    
-  # Add vertical line and rectangle only if there was a transplant
-  if(length(tx_seq_number) > 0 && !is.na(tx_seq_number)) {
-    p <- p + 
-      geom_rect(
-        xmin = tx_seq_number - 2,
-        xmax = tx_seq_number + 2,
-        ymin = recipient_distance - 25,
-        ymax = recipient_distance + 25,
-        fill = NA,
-        color = "red",
-        linewidth = 1
-      ) + 
-      scale_linetype_manual(values = "dashed")
-  }
-  
-  return(p)
-}
-```
-
-
+## Distance by sequence analysis
 ```{r}
-visualize_national_uscrs(sample_match_id)
-
-ggsave(here("results", "national_uscrs_example.pdf"))
-```
-```{r}
-visualize_national_uscrs(sample_match_id) + lims(x = c(0, 100))
-
-ggsave(here("results", "national_uscrs_example_first_100.pdf"))
-```
-# visualize acuity circle US-CRS allocation for a single match run
-
-```{r visualize-acuity-uscrs}
-# Function to visualize acuity circle US-CRS allocation for a single match run
-visualize_acuity_uscrs <- function(match_id, match_data = heart_only_match_run_counterfactual, 
-                                  show_us_crs = TRUE,
-                                  sequence_limit = 300) {
-  
-  # Check if acuity circle data is available
-  if(!exists("heart_only_match_run_counterfactual")) {
-    stop("Acuity Circle US-CRS data not available. Please run acuity_circle_uscrs.Rmd first.")
-  }
-  
-  # Get match run information
-  match_info <- match_data %>%
-    filter(MATCH_ID == match_id) %>%
-    select(DONOR_ID, DON_ABO, MATCH_SUBMIT_DT) %>%
-    distinct()
-  
-  if(nrow(match_info) == 0) {
-    stop("Match ID not found in acuity circle US-CRS dataset")
-  }
-  
-  donor_id <- match_info$DONOR_ID
-  donor_blood_type <- match_info$DON_ABO
-  match_date <- match_info$MATCH_SUBMIT_DT
-  
-  # Get the actual recipient sequence number as numeric value
-  tx_seq_number <- match_data %>%
-    filter(is.na(REC_TX_DT) == FALSE & MATCH_ID == match_id) %>%
-    pull(us_crs_sequence)
-  
-  # Get recipient distance for the rectangle
-  recipient_distance <- match_data %>%
-    filter(is.na(REC_TX_DT) == FALSE & MATCH_ID == match_id) %>%
-    pull(PTR_DISTANCE)
-  
-  if(length(tx_seq_number) == 0 || is.na(tx_seq_number)) {
-     outcome <- "Not utilized"
-  } else {
-     outcome <- paste("Recipient at sequence:", tx_seq_number, "\nDistance:", recipient_distance, "NM")
-  }
-  
-  # Greyscale for US-CRS, ordered colors for status urgency
-  if (show_us_crs){
-    p <- match_data %>% filter(MATCH_ID == match_id) %>%
-      ggplot(aes(x = us_crs_sequence, y = PTR_DISTANCE, 
-             fill = us_crs_score, color = status)) +
-          scale_fill_gradient(low = "white", high = "black", na.value = "grey90", 
-                      name = "US-CRS Score")
-  } else{
-    p <- match_data %>% filter(MATCH_ID == match_id) %>%
-      ggplot(aes(x = us_crs_sequence, y = PTR_DISTANCE, 
-             color = status))
-  }
-  
-  p <- p + geom_point(shape = 21, size = 2, alpha = 0.8, stroke = 1) + 
-    scale_color_manual(values = c("Status 1" = "#D23105FF",
-                                  "Status 1A (pediatric)" = "#7A0403FF",
-                                  "Status 1B (pediatric)" = "#EDD03AFF",
-                                  "Status 2" = "#FB8022FF",
-                                  "Status 2 (pediatric)" = "#466BE3FF",
-                                  "Status 3" = "#A2FC3CFF",
-                                  "Status 4" = "#31F299FF",
-                                  "Status 5" = "#28BBECFF",
-                                  "Status 6" = "#30123BFF"),
-                       name = "Current Status") + 
-    labs(x = "Sequence Number", y = "Distance (NM)", 
-         fill = "US-CRS Score", color = "Heart Status", linetype = "Recipient", shape = "Candidate blood type") +
-    ggtitle(paste0("Match ID: ", match_id, " | Donor: ", donor_id, " (", donor_blood_type, ") | ", outcome)) +
-    theme_minimal()
-    
-  # Add vertical line and rectangle only if there was a transplant
-  if(length(tx_seq_number) > 0 && !is.na(tx_seq_number)) {
-    p <- p + 
-      geom_rect(
-        xmin = tx_seq_number - 2,
-        xmax = tx_seq_number + 2,
-        ymin = recipient_distance - 25,
-        ymax = recipient_distance + 25,
-        fill = NA,
-        color = "red",
-        linewidth = 1
-      ) + 
-      scale_linetype_manual(values = "dashed")
-  }
-  
-  return(p)
-}
-```
-
-```{r}
-visualize_acuity_uscrs(sample_match_id)
-
-ggsave(here("results", "acuity_uscrs_example.pdf"))
-```
-```{r}
-visualize_acuity_uscrs(sample_match_id) + lims(x = c(0, 100))
-
-ggsave(here("results", "acuity_uscrs_example_first_100.pdf"))
-```
-
-
-
-## Visualization Functions for US-CRS Allocations
-
-```{r visualization-functions}
-# Function to visualize national US-CRS allocation for a single match run
-visualize_national_uscrs <- function(match_id, match_data = heart_only_match_run_national) {
-  
-  # Get match run information
-  match_info <- match_data %>%
-    filter(MATCH_ID == match_id) %>%
-    select(DONOR_ID, DON_ABO, MATCH_SUBMIT_DT) %>%
-    distinct()
-  
-  if(nrow(match_info) == 0) {
-    stop("Match ID not found in national US-CRS dataset")
-  }
-  
-  donor_id <- match_info$DONOR_ID
-  donor_blood_type <- match_info$DON_ABO
-  match_date <- match_info$MATCH_SUBMIT_DT
-  
-  # Create the visualization (matching visualize_mr_with_uscrs format)
-  p <- match_data %>%
-    filter(MATCH_ID == match_id) %>%
-    ggplot(aes(x = national_uscrs_sequence, y = PTR_DISTANCE, 
-               fill = us_crs_score, color = status)) +
-    geom_point(shape = 21, size = 4, alpha = 0.8, stroke = 1.5) + 
-    scale_fill_gradient(low = "white", high = "black", na.value = "grey90", 
-                        name = "US-CRS Score") +
-    scale_color_manual(values = c("Status 1" = "#D23105FF",
-                                  "Status 1A (pediatric)" = "#7A0403FF",
-                                  "Status 1B (pediatric)" = "#EDD03AFF",
-                                  "Status 2" = "#FB8022FF",
-                                  "Status 2 (pediatric)" = "#466BE3FF",
-                                  "Status 3" = "#A2FC3CFF",
-                                  "Status 4" = "#31F299FF",
-                                  "Status 5" = "#28BBECFF",
-                                  "Status 6" = "#30123BFF"),
-                       name = "Current Status") +
-    labs(x = "National US-CRS Sequence Position", y = "Distance (NM)", 
-         title = paste("National US-CRS Allocation:", match_id),
-         subtitle = paste("Donor:", donor_id, "|", donor_blood_type, "|", match_date)) +
-    theme_minimal() +
-    theme(
-      plot.title = element_text(size = 12, face = "bold"),
-      plot.subtitle = element_text(size = 10, color = "gray40")
-    )
-  
-  return(p)
-}
-
-# Function to visualize acuity circle US-CRS allocation for a single match run  
-visualize_acuity_uscrs <- function(match_id, match_data = heart_only_match_run_counterfactual) {
-  
-  # Get match run information
-  match_info <- match_data %>%
-    filter(MATCH_ID == match_id) %>%
-    select(DONOR_ID, DON_ABO, MATCH_SUBMIT_DT) %>%
-    distinct()
-  
-  if(nrow(match_info) == 0) {
-    stop("Match ID not found in acuity circle US-CRS dataset")
-  }
-  
-  donor_id <- match_info$DONOR_ID
-  donor_blood_type <- match_info$DON_ABO
-  match_date <- match_info$MATCH_SUBMIT_DT
-  
-  # Create the visualization (matching visualize_mr_with_uscrs format)
-  p <- match_data %>%
-    filter(MATCH_ID == match_id) %>%
-    ggplot(aes(x = us_crs_sequence, y = PTR_DISTANCE, 
-               fill = us_crs_score, color = status)) +
-    geom_point(shape = 21, size = 4, alpha = 0.8, stroke = 1.5) + 
-    scale_fill_gradient(low = "white", high = "black", na.value = "grey90", 
-                        name = "US-CRS Score") +
-    scale_color_manual(values = c("Status 1" = "#D23105FF",
-                                  "Status 1A (pediatric)" = "#7A0403FF",
-                                  "Status 1B (pediatric)" = "#EDD03AFF",
-                                  "Status 2" = "#FB8022FF",
-                                  "Status 2 (pediatric)" = "#466BE3FF",
-                                  "Status 3" = "#A2FC3CFF",
-                                  "Status 4" = "#31F299FF",
-                                  "Status 5" = "#28BBECFF",
-                                  "Status 6" = "#30123BFF"),
-                       name = "Current Status") +
-    labs(x = "Acuity Circle US-CRS Sequence Position", y = "Distance (NM)", 
-         title = paste("Acuity Circle US-CRS Allocation:", match_id),
-         subtitle = paste("Donor:", donor_id, "|", donor_blood_type, "|", match_date)) +
-    theme_minimal() +
-    theme(
-      plot.title = element_text(size = 12, face = "bold"),
-      plot.subtitle = element_text(size = 10, color = "gray40")
-    )
-  
-  return(p)
-}
-
-# Function to visualize current allocation (from original data)
-visualize_current_allocation <- function(match_id, match_data = heart_only_match_run_with_uscrs) {
-  
-  # Get match run information  
-  match_info <- match_data %>%
-    filter(MATCH_ID == match_id) %>%
-    select(DONOR_ID, DON_ABO, MATCH_SUBMIT_DT) %>%
-    distinct()
-  
-  if(nrow(match_info) == 0) {
-    stop("Match ID not found in current allocation dataset")
-  }
-  
-  donor_id <- match_info$DONOR_ID
-  donor_blood_type <- match_info$DON_ABO
-  match_date <- match_info$MATCH_SUBMIT_DT
-  
-  # Create the visualization (matching visualize_mr_with_uscrs format)
-  p <- match_data %>%
-    filter(MATCH_ID == match_id) %>%
-    ggplot(aes(x = PTR_SEQUENCE_NUM, y = PTR_DISTANCE, 
-               fill = us_crs_score, color = status)) +
-    geom_point(shape = 21, size = 4, alpha = 0.8, stroke = 1.5) + 
-    scale_fill_gradient(low = "white", high = "black", na.value = "grey90", 
-                        name = "US-CRS Score") +
-    scale_color_manual(values = c("Status 1" = "#D23105FF",
-                                  "Status 1A (pediatric)" = "#7A0403FF",
-                                  "Status 1B (pediatric)" = "#EDD03AFF",
-                                  "Status 2" = "#FB8022FF",
-                                  "Status 2 (pediatric)" = "#466BE3FF",
-                                  "Status 3" = "#A2FC3CFF",
-                                  "Status 4" = "#31F299FF",
-                                  "Status 5" = "#28BBECFF",
-                                  "Status 6" = "#30123BFF"),
-                       name = "Current Status") +
-    labs(x = "Current Sequence Position", y = "Distance (NM)", 
-         title = paste("Current 6-Status Allocation:", match_id),
-         subtitle = paste("Donor:", donor_id, "|", donor_blood_type, "|", match_date)) +
-    theme_minimal() +
-    theme(
-      plot.title = element_text(size = 12, face = "bold"),
-      plot.subtitle = element_text(size = 10, color = "gray40")
-    )
-  
-  return(p)
-}
-```
-
-## Sample Individual Match Run Comparisons
-
-```{r sample-individual-visualizations}
-if(exists("heart_only_match_run_national") && exists("heart_only_match_run_counterfactual")) {
-  
-  # Select a sample match ID that exists in all datasets
-  sample_matches <- intersect(
-    intersect(heart_only_match_run_with_uscrs$MATCH_ID, heart_only_match_run_national$MATCH_ID),
-    heart_only_match_run_counterfactual$MATCH_ID
-  )
-  
-  if(length(sample_matches) > 0) {
-    
-    # Select the 50th match for demonstration
-    sample_match_id <- sample_matches[min(50, length(sample_matches))]
-    
-    cat("Visualizing allocation systems for Match ID:", sample_match_id, "\n")
-    
-    # Show match information
-    sample_info <- heart_only_match_run_with_uscrs %>%
-      filter(MATCH_ID == sample_match_id) %>%
-      select(MATCH_ID, DONOR_ID, DON_ABO, MATCH_SUBMIT_DT) %>%
-      distinct()
-    
-    cat("Donor ID:", sample_info$DONOR_ID, "\n")
-    cat("Donor ABO:", sample_info$DON_ABO, "\n") 
-    cat("Match Date:", sample_info$MATCH_SUBMIT_DT, "\n")
-    cat("Number of candidates:", nrow(heart_only_match_run_with_uscrs %>% filter(MATCH_ID == sample_match_id)), "\n\n")
-    
-    # Create individual system visualizations
-    p_current <- visualize_current_allocation(sample_match_id)
-    p_national <- visualize_national_uscrs(sample_match_id)
-    p_acuity <- visualize_acuity_uscrs(sample_match_id)
-    
-    # Display plots
-    print(p_current)
-    print(p_national)  
-    print(p_acuity)
-    
-    # Save individual plots
-    ggsave(here("results", paste0("individual_current_", sample_match_id, ".png")), p_current, 
-           width = 10, height = 8, dpi = 300)
-    ggsave(here("results", paste0("individual_national_", sample_match_id, ".png")), p_national,
-           width = 10, height = 8, dpi = 300)
-    ggsave(here("results", paste0("individual_acuity_", sample_match_id, ".png")), p_acuity,
-           width = 10, height = 8, dpi = 300)
-    
-    # Create side-by-side comparison of top 20 candidates
-    comparison_data <- heart_only_match_run_with_uscrs %>%
-      filter(MATCH_ID == sample_match_id) %>%
-      select(PX_ID, MATCH_ID, PTR_SEQUENCE_NUM, us_crs_score, status) %>%
-      left_join(
-        heart_only_match_run_national %>% 
-          filter(MATCH_ID == sample_match_id) %>%
-          select(PX_ID, MATCH_ID, national_uscrs_sequence),
-        by = c("PX_ID", "MATCH_ID")
-      ) %>%
-      left_join(
-        heart_only_match_run_counterfactual %>% 
-          filter(MATCH_ID == sample_match_id) %>%
-          select(PX_ID, MATCH_ID, us_crs_sequence),
-        by = c("PX_ID", "MATCH_ID")
-      ) %>%
-      rename(
-        current_seq = PTR_SEQUENCE_NUM,
-        national_seq = national_uscrs_sequence,  
-        acuity_seq = us_crs_sequence
-      ) %>%
-      filter(current_seq <= 20) %>%  # Focus on top 20 from current system
-      arrange(current_seq)
-    
-    # Create comparison table visualization
-    cat("\\n=== TOP 20 CANDIDATES COMPARISON ===\\n")
-    comparison_summary <- comparison_data %>%
-      select(PX_ID, current_seq, national_seq, acuity_seq, us_crs_score, status) %>%
-      mutate(
-        nat_change = national_seq - current_seq,
-        acuity_change = acuity_seq - current_seq
-      )
-    
-    print(comparison_summary)
-    
-  } else {
-    cat("No common match IDs found across all three datasets for individual visualization\\n")
-  }
-  
-} else {
-  cat("Individual match run visualizations require both national and acuity circle datasets\\n")
-  cat("Please ensure both national_uscrs_allocation.Rmd and acuity_circle_uscrs.Rmd have been run\\n")
-}
-```
-
-## Investigation: US-CRS Score Pattern Analysis
-
-```{r investigate-uscrs-pattern}
-if(exists("heart_only_match_run_national") && exists("heart_only_match_run_with_uscrs")) {
-  
-  # Investigate the high sequence position candidates in current system
-  high_sequence_analysis <- heart_only_match_run_with_uscrs %>%
-    filter(!is.na(us_crs_score) & PTR_SEQUENCE_NUM > 150) %>%
-    arrange(desc(us_crs_score)) %>%
-    select(PX_ID, MATCH_ID, PTR_SEQUENCE_NUM, us_crs_score, status, PTR_DISTANCE, CAN_ABO, DON_ABO) %>%
-    head(20)
-  
-  cat("=== HIGH SEQUENCE POSITION CANDIDATES WITH HIGH US-CRS SCORES ===\n")
-  cat("These are candidates ranked >150th in current system but have high US-CRS scores:\n\n")
-  print(high_sequence_analysis)
-  
-  # Status distribution at high sequence positions
-  status_at_high_seq <- heart_only_match_run_with_uscrs %>%
-    filter(PTR_SEQUENCE_NUM > 150) %>%
-    count(status, sort = TRUE)
-  
-  cat("\n=== STATUS DISTRIBUTION AT HIGH SEQUENCE POSITIONS (>150) ===\n")
-  print(status_at_high_seq)
-  
-  # Compare US-CRS scores by distance for high sequence candidates
-  distance_uscrs_analysis <- heart_only_match_run_with_uscrs %>%
-    filter(PTR_SEQUENCE_NUM > 150 & !is.na(us_crs_score)) %>%
+sequence_comparison %>%
+  pivot_longer(
+      cols = c(current_sequence, national_sequence, acuity_sequence),
+      names_to = "allocation_system",
+      values_to = "sequence_position"
+    ) %>%
     mutate(
-      distance_category = case_when(
-        PTR_DISTANCE <= 500 ~ "≤500 NM",
-        PTR_DISTANCE <= 1000 ~ "501-1000 NM",
-        PTR_DISTANCE <= 2000 ~ "1001-2000 NM",
-        TRUE ~ ">2000 NM"
-      )
+      allocation_system = case_when(
+        allocation_system == "current_sequence" ~ "Current 6-Status",
+        allocation_system == "national_sequence" ~ "National US-CRS", 
+        allocation_system == "acuity_sequence" ~ "Acuity Circle US-CRS"
+      ),
+      allocation_system = factor(allocation_system, 
+                                levels = c("Current 6-Status", "National US-CRS", "Acuity Circle US-CRS"))
     ) %>%
-    group_by(distance_category) %>%
-    summarise(
-      n = n(),
-      mean_uscrs = round(mean(us_crs_score, na.rm = TRUE), 1),
-      median_uscrs = round(median(us_crs_score, na.rm = TRUE), 1),
-      max_uscrs = round(max(us_crs_score, na.rm = TRUE), 1),
-      .groups = "drop"
-    ) %>%
-    arrange(desc(mean_uscrs))
-  
-  cat("\n=== HIGH SEQUENCE CANDIDATES BY DISTANCE ===\n")
-  cat("US-CRS scores for candidates ranked >150th by distance from donor:\n\n")
-  print(distance_uscrs_analysis)
-  
-  # Blood type compatibility analysis
-  blood_type_analysis <- heart_only_match_run_with_uscrs %>%
-    filter(PTR_SEQUENCE_NUM > 150 & !is.na(us_crs_score)) %>%
-    mutate(
-      blood_compatible = case_when(
-        # Perfect match
-        CAN_ABO == DON_ABO ~ "Perfect Match",
-        # Compatible combinations
-        DON_ABO == "O" ~ "Universal Donor",
-        (CAN_ABO == "AB") ~ "Universal Recipient", 
-        # Incompatible
-        TRUE ~ "Incompatible"
-      )
-    ) %>%
-    group_by(blood_compatible) %>%
-    summarise(
-      n = n(),
-      mean_uscrs = round(mean(us_crs_score, na.rm = TRUE), 1),
-      median_uscrs = round(median(us_crs_score, na.rm = TRUE), 1),
-      .groups = "drop"
-    ) %>%
-    arrange(desc(mean_uscrs))
-  
-  cat("\n=== HIGH SEQUENCE CANDIDATES BY BLOOD TYPE COMPATIBILITY ===\n")
-  print(blood_type_analysis)
-  
-  # Create visualization showing the pattern
-  sequence_pattern_viz <- heart_only_match_run_with_uscrs %>%
-    filter(!is.na(us_crs_score) & PTR_SEQUENCE_NUM <= 300) %>%
-    mutate(
-      sequence_bin = cut(PTR_SEQUENCE_NUM, breaks = seq(0, 300, 10), include.lowest = TRUE),
-      sequence_midpoint = (as.numeric(sequence_bin) - 1) * 10 + 5
-    ) %>%
-    group_by(sequence_bin, sequence_midpoint) %>%
-    summarise(
-      mean_uscrs = mean(us_crs_score, na.rm = TRUE),
-      median_uscrs = median(us_crs_score, na.rm = TRUE),
-      n_candidates = n(),
-      high_uscrs_candidates = sum(us_crs_score > 35, na.rm = TRUE),
-      pct_high_uscrs = high_uscrs_candidates / n_candidates * 100,
-      .groups = "drop"
-    )
-  
-  p_pattern <- sequence_pattern_viz %>%
-    ggplot(aes(x = sequence_midpoint)) +
-    geom_line(aes(y = mean_uscrs, color = "Mean US-CRS"), size = 1.2) +
-    geom_line(aes(y = pct_high_uscrs * 0.5, color = "% High US-CRS (>35)"), size = 1.2, linetype = "dashed") +
-    scale_color_manual(
-      values = c("Mean US-CRS" = "#d73027", "% High US-CRS (>35)" = "#2E8B57"),
-      name = "Metric"
-    ) +
-    scale_y_continuous(
-      name = "Mean US-CRS Score",
-      sec.axis = sec_axis(~ . * 2, name = "% Candidates with US-CRS > 35")
-    ) +
+  group_by(allocation_system, sequence_position) %>%
+  filter(sequence_position < 100) %>%
+  summarise(
+    median_distance = median(PTR_DISTANCE, na.rm = TRUE),
+    mean_distance = mean(PTR_DISTANCE, na.rm = TRUE),
+    low_iqr = quantile(PTR_DISTANCE, 0.25, na.rm = TRUE),
+    high_iqr = quantile(PTR_DISTANCE, 0.75, na.rm = TRUE)
+  ) %>%
+  ggplot(aes(x = sequence_position, y = median_distance, 
+             ymin = low_iqr, ymax = high_iqr, color = allocation_system)) +
+  geom_line(size = 1.2, alpha = 0.8) +
+  geom_point(alpha = 0.6, size = 0.8) +
+  #geom_errorbar(width = 0.2, alpha = 0.5) +
+  scale_x_continuous(breaks = seq(0, 100, 20)) +
     labs(
-      title = "US-CRS Score Pattern Analysis - Current 6-Status System",
-      subtitle = "Investigating the uptick in US-CRS scores at high sequence positions",
-      x = "Current System Sequence Position"
-    ) +
-    theme_minimal() +
-    theme(
-      plot.title = element_text(size = 12, face = "bold"),
-      legend.position = "bottom"
-    )
-  
-  print(p_pattern)
-  
-  # Save the pattern analysis plot
-  ggsave(here("results", "uscrs_sequence_pattern_analysis.png"), p_pattern,
-         width = 12, height = 8, dpi = 300)
-         
-  # Compare how these high US-CRS/high sequence candidates rank in National system
-  crossover_analysis <- heart_only_match_run_with_uscrs %>%
-    filter(PTR_SEQUENCE_NUM > 150 & !is.na(us_crs_score)) %>%
-    left_join(
-      heart_only_match_run_national %>% 
-        select(PX_ID, MATCH_ID, national_uscrs_sequence),
-      by = c("PX_ID", "MATCH_ID")
-    ) %>%
-    filter(!is.na(national_uscrs_sequence)) %>%
-    mutate(
-      position_improvement = PTR_SEQUENCE_NUM - national_uscrs_sequence
-    ) %>%
-    arrange(desc(position_improvement)) %>%
-    select(PX_ID, MATCH_ID, PTR_SEQUENCE_NUM, national_uscrs_sequence, position_improvement, 
-           us_crs_score, status, PTR_DISTANCE) %>%
-    head(15)
-  
-  cat("\n=== CANDIDATES WITH BIGGEST IMPROVEMENTS (Current >150, High US-CRS) ===\n")
-  cat("These high US-CRS candidates were deprioritized in current system but prioritized in National US-CRS:\n\n")
-  print(crossover_analysis)
-  
-} else {
-  cat("Pattern analysis requires both original and national datasets\n")
-}
-```
-
-## distribution of US-CRS scores by status
-```{r}
-if(exists("heart_only_match_run_with_uscrs")) {
-  
-  # Create a distribution plot of US-CRS scores by status
-  us_crs_distribution <- heart_only_match_run_with_uscrs %>%
-    filter(!is.na(us_crs_score)) %>%
-    ggplot(aes(x = us_crs_score, fill = status)) +
-    geom_histogram(alpha = 0.6) +
-    scale_fill_manual(values = c("Status 1" = "#D23105FF",
-                                 "Status 1A (pediatric)" = "#7A0403FF",
-                                 "Status 1B (pediatric)" = "#EDD03AFF",
-                                 "Status 2" = "#FB8022FF",
-                                 "Status 2 (pediatric)" = "#466BE3FF",
-                                 "Status 3" = "#A2FC3CFF",
-                                 "Status 4" = "#31F299FF",
-                                 "Status 5" = "#28BBECFF",
-                                 "Status 6" = "#30123BFF"),
-                      name = "Current Status") +
-    labs(
-      title = "Distribution of US-CRS Scores by Current Heart Status",
-      x = "US-CRS Score",
-      y = "Density"
+      title = "US-CRS Risk Stratification by Allocation System",
+      subtitle = "Higher median US-CRS scores indicate better risk prioritization",
+      x = "Sequence Position (Lower = Higher Priority)",
+      y = "Median US-CRS Score"
     ) +
     theme_minimal() +
     theme(
       plot.title = element_text(size = 14, face = "bold"),
-      legend.position = "right"
-    ) + facet_wrap(~status)
+      legend.position = "bottom"
+    )
   
-  print(us_crs_distribution)
-  
-  # Save the distribution plot
-  ggsave(here("results", "us_crs_score_distribution_by_status.png"), us_crs_distribution, 
-         width = 10, height = 6, dpi = 300)
-  
-} else {
-  cat("US-CRS score distribution plot requires heart_only_match_run_with_uscrs dataset\\n")
-}
 ```
 
 
-
-## Additional Individual Match Analysis
-
-```{r additional-individual-analysis}
-if(exists("sample_match_id") && exists("comparison_data")) {
-  
-  # Analyze sequence position changes for this specific match
-  position_changes <- comparison_data %>%
-    mutate(
-      national_change = national_seq - current_seq,
-      acuity_change = acuity_seq - current_seq
-    )
-  
-  # Summary of changes
-  change_summary <- position_changes %>%
-    summarise(
-      candidates = n(),
-      national_improved = sum(national_change < 0, na.rm = TRUE),
-      national_worsened = sum(national_change > 0, na.rm = TRUE),
-      national_unchanged = sum(national_change == 0, na.rm = TRUE),
-      acuity_improved = sum(acuity_change < 0, na.rm = TRUE),
-      acuity_worsened = sum(acuity_change > 0, na.rm = TRUE),
-      acuity_unchanged = sum(acuity_change == 0, na.rm = TRUE)
-    )
-  
-  cat("\\n=== SEQUENCE POSITION CHANGE SUMMARY (TOP 20) ===\\n")
-  cat("Total candidates analyzed:", change_summary$candidates, "\\n\\n")
-  
-  cat("National US-CRS vs Current:\\n")
-  cat("- Improved position:", change_summary$national_improved, "candidates\\n")
-  cat("- Worsened position:", change_summary$national_worsened, "candidates\\n") 
-  cat("- Unchanged position:", change_summary$national_unchanged, "candidates\\n\\n")
-  
-  cat("Acuity Circle US-CRS vs Current:\\n")
-  cat("- Improved position:", change_summary$acuity_improved, "candidates\\n")
-  cat("- Worsened position:", change_summary$acuity_worsened, "candidates\\n")
-  cat("- Unchanged position:", change_summary$acuity_unchanged, "candidates\\n\\n")
-  
-  # Create visualization of position changes
-  change_viz_data <- position_changes %>%
-    select(PX_ID, us_crs_score, status, national_change, acuity_change) %>%
-    pivot_longer(
-      cols = c(national_change, acuity_change),
-      names_to = "system", 
-      values_to = "position_change"
-    ) %>%
-    mutate(
-      system = case_when(
-        system == "national_change" ~ "National US-CRS",
-        system == "acuity_change" ~ "Acuity Circle US-CRS"
-      ),
-      change_direction = case_when(
-        position_change < 0 ~ "Improved",
-        position_change > 0 ~ "Worsened", 
-        TRUE ~ "Unchanged"
-      )
-    )
-  
-  p_changes <- change_viz_data %>%
-    ggplot(aes(x = us_crs_score, y = position_change, color = change_direction)) +
-    geom_point(size = 3, alpha = 0.8) +
-    geom_hline(yintercept = 0, linetype = "dashed", color = "gray50") +
-    facet_wrap(~system) +
-    scale_color_manual(
-      values = c("Improved" = "#2E8B57", "Worsened" = "#FF6347", "Unchanged" = "#808080"),
-      name = "Position Change"
-    ) +
-    labs(
-      title = paste("Individual Match Analysis - Position Changes (Match ID:", sample_match_id, ")"),
-      subtitle = "Top 20 candidates from current allocation system",
-      x = "US-CRS Score",
-      y = "Position Change (Negative = Better Priority)"
-    ) +
-    theme_minimal() +
-    theme(
-      plot.title = element_text(size = 12, face = "bold"),
-      strip.text = element_text(face = "bold")
-    )
-  
-  print(p_changes)
-  
-  # Save the position change plot
-  ggsave(here("results", paste0("individual_position_changes_", sample_match_id, ".png")), p_changes,
-         width = 12, height = 6, dpi = 300)
-  
-}
-```
-
-## Side-by-Side Allocation System Comparisons
-
-```{r three-system-comparison-plots}
-if(exists("heart_only_match_run_national") && exists("heart_only_match_run_counterfactual")) {
-  
-  # Select a sample match ID that exists in all datasets for comparison
-  comparison_matches <- intersect(
-    intersect(heart_only_match_run_with_uscrs$MATCH_ID, heart_only_match_run_national$MATCH_ID),
-    heart_only_match_run_counterfactual$MATCH_ID
+# WORKING FIGURES
+## Priority change by US-CRS score
+```{r }
+# Analyze the impact of switching to national US-CRS
+sequence_impact <- heart_only_match_run_national %>%
+  mutate(
+    sequence_change = national_uscrs_sequence - PTR_SEQUENCE_NUM,
+    improvement_category = case_when(
+      sequence_change <= -10 ~ "Major Improvement (≥10 spots up)",
+      sequence_change <= -5 ~ "Moderate Improvement (5-9 spots up)", 
+      sequence_change <= -1 ~ "Minor Improvement (1-4 spots up)",
+      sequence_change == 0 ~ "No Change",
+      sequence_change <= 4 ~ "Minor Decline (1-4 spots down)",
+      sequence_change <= 9 ~ "Moderate Decline (5-9 spots down)",
+      sequence_change >= 10 ~ "Major Decline (≥10 spots down)"
+    ),
+    improvement_category = factor(improvement_category, levels = c(
+      "Major Improvement (≥10 spots up)",
+      "Moderate Improvement (5-9 spots up)", 
+      "Minor Improvement (1-4 spots up)",
+      "No Change",
+      "Minor Decline (1-4 spots down)",
+      "Moderate Decline (5-9 spots down)",
+      "Major Decline (≥10 spots down)"
+    ))
   )
-  
-  if(length(comparison_matches) > 0) {
-    
-    # Select multiple matches for demonstration
-    selected_matches <- comparison_matches[c(10, 25, 40)]  # Select 3 different matches
-    
-    for(match_idx in seq_along(selected_matches)) {
-      
-      comparison_match_id <- selected_matches[match_idx]
-      
-      cat("\\n=== COMPARISON", match_idx, "- MATCH ID:", comparison_match_id, "===\\n")
-      
-      # Show match information
-      match_info <- heart_only_match_run_with_uscrs %>%
-        filter(MATCH_ID == comparison_match_id) %>%
-        select(MATCH_ID, DONOR_ID, DON_ABO, MATCH_SUBMIT_DT) %>%
-        distinct()
-      
-      n_candidates <- nrow(heart_only_match_run_with_uscrs %>% filter(MATCH_ID == comparison_match_id))
-      
-      cat("Donor ID:", match_info$DONOR_ID, "\\n")
-      cat("Donor ABO:", match_info$DON_ABO, "\\n")
-      cat("Match Date:", match_info$MATCH_SUBMIT_DT, "\\n")
-      cat("Number of candidates:", n_candidates, "\\n\\n")
-      
-      # Create all three visualizations
-      p_current <- visualize_current_allocation(comparison_match_id)
-      p_national <- visualize_national_uscrs(comparison_match_id)
-      p_acuity <- visualize_acuity_uscrs(comparison_match_id)
-      
-      # Combine plots using patchwork for side-by-side comparison
-      combined_plot <- p_current / p_national / p_acuity +
-        plot_layout(ncol = 1, heights = c(1, 1, 1)) +
-        plot_annotation(
-          title = paste("Three-System Allocation Comparison - Match ID:", comparison_match_id),
-          subtitle = paste("Donor:", match_info$DONOR_ID, "| ABO:", match_info$DON_ABO, "| Candidates:", n_candidates),
-          theme = theme(
-            plot.title = element_text(size = 16, face = "bold"),
-            plot.subtitle = element_text(size = 12, color = "gray40")
-          )
-        )
-      
-      print(combined_plot)
-      
-      # Save the combined plot
-      ggsave(here("results", paste0("three_system_comparison_", comparison_match_id, ".png")), 
-             combined_plot, width = 14, height = 18, dpi = 300)
-      
-      # Create horizontal layout version as well
-      combined_horizontal <- p_current | p_national | p_acuity
-      combined_horizontal <- combined_horizontal + 
-        plot_layout(ncol = 3) +
-        plot_annotation(
-          title = paste("Three-System Comparison (Horizontal) - Match ID:", comparison_match_id),
-          subtitle = paste("Donor:", match_info$DONOR_ID, "| ABO:", match_info$DON_ABO),
-          theme = theme(
-            plot.title = element_text(size = 14, face = "bold"),
-            plot.subtitle = element_text(size = 11, color = "gray40")
-          )
-        )
-      
-      print(combined_horizontal)
-      
-      # Save horizontal version
-      ggsave(here("results", paste0("three_system_horizontal_", comparison_match_id, ".png")), 
-             combined_horizontal, width = 20, height = 8, dpi = 300)
-      
-      # Generate summary statistics for this specific match
-      match_comparison_data <- heart_only_match_run_with_uscrs %>%
-        filter(MATCH_ID == comparison_match_id) %>%
-        select(PX_ID, MATCH_ID, PTR_SEQUENCE_NUM, PTR_DISTANCE, us_crs_score, status) %>%
-        left_join(
-          heart_only_match_run_national %>% 
-            filter(MATCH_ID == comparison_match_id) %>%
-            select(PX_ID, MATCH_ID, national_uscrs_sequence),
-          by = c("PX_ID", "MATCH_ID")
-        ) %>%
-        left_join(
-          heart_only_match_run_counterfactual %>% 
-            filter(MATCH_ID == comparison_match_id) %>%
-            select(PX_ID, MATCH_ID, us_crs_sequence),
-          by = c("PX_ID", "MATCH_ID")
-        ) %>%
-        rename(
-          current_seq = PTR_SEQUENCE_NUM,
-          national_seq = national_uscrs_sequence,  
-          acuity_seq = us_crs_sequence
-        ) %>%
-        mutate(
-          national_change = national_seq - current_seq,
-          acuity_change = acuity_seq - current_seq
-        )
-      
-      # Summary statistics for this match
-      match_summary <- match_comparison_data %>%
-        summarise(
-          total_candidates = n(),
-          # National vs Current
-          nat_improved = sum(national_change < 0, na.rm = TRUE),
-          nat_worsened = sum(national_change > 0, na.rm = TRUE),
-          nat_unchanged = sum(national_change == 0, na.rm = TRUE),
-          nat_mean_change = round(mean(national_change, na.rm = TRUE), 2),
-          # Acuity vs Current  
-          acuity_improved = sum(acuity_change < 0, na.rm = TRUE),
-          acuity_worsened = sum(acuity_change > 0, na.rm = TRUE),
-          acuity_unchanged = sum(acuity_change == 0, na.rm = TRUE),
-          acuity_mean_change = round(mean(acuity_change, na.rm = TRUE), 2),
-          # Distance and US-CRS stats
-          mean_distance = round(mean(PTR_DISTANCE, na.rm = TRUE), 1),
-          median_distance = round(median(PTR_DISTANCE, na.rm = TRUE), 1),
-          mean_uscrs = round(mean(us_crs_score, na.rm = TRUE), 1),
-          median_uscrs = round(median(us_crs_score, na.rm = TRUE), 1)
-        )
-      
-      cat("MATCH SUMMARY STATISTICS:\\n")
-      cat("Total candidates:", match_summary$total_candidates, "\\n")
-      cat("Mean distance:", match_summary$mean_distance, "NM\\n")
-      cat("Mean US-CRS score:", match_summary$mean_uscrs, "\\n\\n")
-      
-      cat("NATIONAL US-CRS vs CURRENT:\\n")
-      cat("- Improved:", match_summary$nat_improved, "candidates\\n")
-      cat("- Worsened:", match_summary$nat_worsened, "candidates\\n") 
-      cat("- Unchanged:", match_summary$nat_unchanged, "candidates\\n")
-      cat("- Mean change:", match_summary$nat_mean_change, "positions\\n\\n")
-      
-      cat("ACUITY CIRCLE US-CRS vs CURRENT:\\n")
-      cat("- Improved:", match_summary$acuity_improved, "candidates\\n")
-      cat("- Worsened:", match_summary$acuity_worsened, "candidates\\n")
-      cat("- Unchanged:", match_summary$acuity_unchanged, "candidates\\n")
-      cat("- Mean change:", match_summary$acuity_mean_change, "positions\\n")
-      
-      # Create a focused comparison of top 10 candidates
-      top10_comparison <- match_comparison_data %>%
-        filter(current_seq <= 10) %>%
-        arrange(current_seq) %>%
-        select(current_seq, national_seq, acuity_seq, PTR_DISTANCE, us_crs_score, status, national_change, acuity_change)
-      
-      if(nrow(top10_comparison) > 0) {
-        cat("\\n=== TOP 10 CANDIDATES DETAILED COMPARISON ===\\n")
-        print(top10_comparison)
-      }
-      
-      cat("\\n" , rep("=", 80), "\\n\\n")
-    }
-    
-    # Create a summary plot showing key metrics across all selected matches
-    summary_data <- tibble()
-    
-    for(match_id in selected_matches) {
-      match_data <- heart_only_match_run_with_uscrs %>%
-        filter(MATCH_ID == match_id) %>%
-        select(PX_ID, MATCH_ID, PTR_SEQUENCE_NUM, PTR_DISTANCE, us_crs_score, status) %>%
-        left_join(
-          heart_only_match_run_national %>% 
-            filter(MATCH_ID == match_id) %>%
-            select(PX_ID, MATCH_ID, national_uscrs_sequence),
-          by = c("PX_ID", "MATCH_ID")
-        ) %>%
-        left_join(
-          heart_only_match_run_counterfactual %>% 
-            filter(MATCH_ID == match_id) %>%
-            select(PX_ID, MATCH_ID, us_crs_sequence),
-          by = c("PX_ID", "MATCH_ID")
-        ) %>%
-        mutate(
-          national_change = national_uscrs_sequence - PTR_SEQUENCE_NUM,
-          acuity_change = us_crs_sequence - PTR_SEQUENCE_NUM
-        ) %>%
-        summarise(
-          match_id = match_id,
-          n_candidates = n(),
-          mean_distance = mean(PTR_DISTANCE, na.rm = TRUE),
-          mean_uscrs = mean(us_crs_score, na.rm = TRUE),
-          national_pct_improved = sum(national_change < 0, na.rm = TRUE) / n() * 100,
-          acuity_pct_improved = sum(acuity_change < 0, na.rm = TRUE) / n() * 100,
-          .groups = "drop"
-        )
-      
-      summary_data <- bind_rows(summary_data, match_data)
-    }
-    
-    # Visualization of summary metrics
-    p_summary <- summary_data %>%
-      pivot_longer(cols = c(national_pct_improved, acuity_pct_improved),
-                   names_to = "system", values_to = "pct_improved") %>%
-      mutate(
-        system = case_when(
-          system == "national_pct_improved" ~ "National US-CRS",
-          system == "acuity_pct_improved" ~ "Acuity Circle US-CRS"
-        ),
-        match_label = paste("Match", match_id)
-      ) %>%
-      ggplot(aes(x = match_label, y = pct_improved, fill = system)) +
-      geom_col(position = "dodge", alpha = 0.8) +
-      scale_fill_manual(values = c("National US-CRS" = "#2E8B57", "Acuity Circle US-CRS" = "#FF6347")) +
-      labs(
-        title = "Percentage of Candidates with Improved Priority",
-        subtitle = "Comparison across selected individual match runs",
-        x = "Match Run",
-        y = "% of Candidates Improved",
-        fill = "Allocation System"
-      ) +
-      theme_minimal() +
-      theme(
-        plot.title = element_text(size = 12, face = "bold"),
-        axis.text.x = element_text(angle = 45, hjust = 1)
-      )
-    
-    print(p_summary)
-    
-    # Save summary plot
-    ggsave(here("results", "individual_matches_summary.png"), p_summary,
-           width = 10, height = 6, dpi = 300)
-    
-    cat("\\n=== INDIVIDUAL MATCH COMPARISON COMPLETE ===\\n")
-    cat("Created", length(selected_matches), "detailed comparisons\\n")
-    cat("Saved", length(selected_matches) * 2, "comparison plots\\n")
-    cat("All plots saved to results/ directory\\n")
-    
-  } else {
-    cat("No common match IDs found for three-system comparison\\n")
-  }
-  
-} else {
-  cat("Three-system comparison requires both national and acuity circle datasets\\n")
-  cat("Please ensure both national_uscrs_allocation.Rmd and acuity_circle_uscrs.Rmd have been run\\n")
-}
+
+# Impact by US-CRS score
+p2 <- sequence_impact %>%
+  filter(!is.na(us_crs_score) & !is.na(improvement_category)) %>%
+  ggplot(aes(x = us_crs_score, fill = improvement_category)) +
+  geom_histogram(binwidth = 2, alpha = 0.8, color = "white", size = 0.1) +
+  scale_fill_brewer(type = "div", palette = "RdYlGn", name = "Sequence Change", 
+                    guide = guide_legend(reverse = TRUE)) +
+  labs(
+    title = "Impact of National US-CRS Allocation by Risk Score",
+    subtitle = "How sequence position changes vary across US-CRS risk levels",
+    x = "US-CRS Score (Higher = Higher Transplant Need)",
+    y = "Number of Candidates"
+  ) +
+  theme_minimal() +
+  theme(
+    plot.title = element_text(size = 14, face = "bold"),
+    plot.subtitle = element_text(size = 11, color = "gray40"),
+    legend.position = "bottom",
+    legend.title = element_text(size = 10, face = "bold")
+  ) +
+  guides(fill = guide_legend(nrow = 2, byrow = TRUE))
+
+print(p2)
+
+# Save impact analysis
+ggsave(here("results", "national_uscrs_impact_by_score.png"), p2, 
+       width = 12, height = 8, dpi = 300)
+
+# Summary statistics
+impact_summary <- sequence_impact %>%
+  filter(!is.na(improvement_category)) %>%
+  count(improvement_category) %>%
+  mutate(percentage = round(n / sum(n) * 100, 1))
+
+print("Sequence Change Impact Summary:")
+print(impact_summary)
 ```
-
-# Figures under developement
-
-
 
 ## Status-Specific Impact Analysis
 ```{r status-impact}
@@ -1479,94 +774,6 @@ if(exists("sequence_comparison")) {
 }
 ```
 
-## Geographic Distance Impact Analysis
-
-```{r distance-impact}
-if(exists("sequence_comparison")) {
-  
-  # Analyze how distance affects the difference between National and Acuity Circle systems
-  distance_impact <- sequence_comparison %>%
-    filter(!is.na(PTR_DISTANCE) & !is.na(national_vs_acuity)) %>%
-    mutate(
-      distance_category = case_when(
-        PTR_DISTANCE <= 250 ~ "≤250 NM",
-        PTR_DISTANCE <= 500 ~ "251-500 NM",
-        PTR_DISTANCE <= 1000 ~ "501-1000 NM", 
-        PTR_DISTANCE <= 1500 ~ "1001-1500 NM",
-        PTR_DISTANCE <= 2500 ~ "1501-2500 NM",
-        TRUE ~ ">2500 NM"
-      ),
-      distance_category = factor(distance_category, levels = c("≤250 NM", "251-500 NM", 
-                                                              "501-1000 NM", "1001-1500 NM", 
-                                                              "1501-2500 NM", ">2500 NM"))
-    ) %>%
-    group_by(distance_category) %>%
-    summarise(
-      n_candidates = n(),
-      mean_distance = round(mean(PTR_DISTANCE, na.rm = TRUE), 0),
-      national_advantage = sum(national_vs_acuity < 0, na.rm = TRUE),
-      acuity_advantage = sum(national_vs_acuity > 0, na.rm = TRUE), 
-      systems_tied = sum(national_vs_acuity == 0, na.rm = TRUE),
-      mean_national_advantage = round(mean(national_vs_acuity, na.rm = TRUE), 1),
-      .groups = "drop"
-    ) %>%
-    mutate(
-      pct_national_advantage = round(national_advantage / n_candidates * 100, 1),
-      pct_acuity_advantage = round(acuity_advantage / n_candidates * 100, 1)
-    )
-  
-  print("Geographic Distance Impact Analysis:")
-  print(distance_impact)
-  
-  # Visualization
-  distance_viz <- sequence_comparison %>%
-    filter(!is.na(PTR_DISTANCE) & !is.na(national_vs_acuity)) %>%
-    mutate(
-      distance_category = case_when(
-        PTR_DISTANCE <= 250 ~ "≤250 NM",
-        PTR_DISTANCE <= 500 ~ "251-500 NM", 
-        PTR_DISTANCE <= 1000 ~ "501-1000 NM",
-        PTR_DISTANCE <= 1500 ~ "1001-1500 NM",
-        PTR_DISTANCE <= 2500 ~ "1501-2500 NM", 
-        TRUE ~ ">2500 NM"
-      ),
-      system_preference = case_when(
-        national_vs_acuity < 0 ~ "National Better",
-        national_vs_acuity > 0 ~ "Acuity Circle Better", 
-        TRUE ~ "Systems Equal"
-      )
-    )
-  
-  p3 <- distance_viz %>%
-    ggplot(aes(x = distance_category, fill = system_preference)) +
-    geom_bar(position = "fill", alpha = 0.8) +
-    scale_fill_manual(
-      values = c("National Better" = "#2E8B57", "Acuity Circle Better" = "#FF6347", "Systems Equal" = "#808080"),
-      name = "System Performance"
-    ) +
-    scale_y_continuous(labels = scales::percent_format()) +
-    labs(
-      title = "National vs Acuity Circle US-CRS System Performance by Distance",
-      subtitle = "Proportion of candidates with better sequence position in each system",
-      x = "Distance from Donor",
-      y = "Percentage of Candidates"
-    ) +
-    theme_minimal() +
-    theme(
-      plot.title = element_text(size = 14, face = "bold"),
-      axis.text.x = element_text(angle = 45, hjust = 1),
-      legend.position = "bottom"
-    )
-  
-  print(p3)
-  
-  ggsave(here("results", "distance_impact_comparison.png"), p3, 
-         width = 12, height = 8, dpi = 300)
-  
-} else {
-  print("Skipping distance impact analysis - comparison data not available")
-}
-```
 
 ## Detailed Sequence Analysis for national allocation
 ```{r sequence-impact-analysis}
@@ -1633,85 +840,3 @@ print(impact_summary)
 ```
 
 
-## Detailed Sequence Analysis for Acuity Circle allocation
-
-
-# Summary Report
-
-```{r summary-report}
-if(exists("sequence_comparison") && exists("status_impact") && exists("distance_impact")) {
-  
-  cat("=== US-CRS MATCH RUN ANALYSIS SUMMARY ===\n\n")
-  
-  cat("1. OVERALL IMPACT:\n")
-  total_candidates <- nrow(sequence_comparison)
-  national_improved <- sum(sequence_comparison$national_vs_current < 0, na.rm = TRUE)
-  acuity_improved <- sum(sequence_comparison$acuity_vs_current < 0, na.rm = TRUE)
-  
-  cat(sprintf("- Total candidates analyzed: %s\n", scales::comma(total_candidates)))
-  cat(sprintf("- National US-CRS improved %s candidates (%.1f%%)\n", 
-              scales::comma(national_improved), national_improved/total_candidates*100))
-  cat(sprintf("- Acuity Circle US-CRS improved %s candidates (%.1f%%)\n", 
-              scales::comma(acuity_improved), acuity_improved/total_candidates*100))
-  
-  cat("\n2. STATUS-SPECIFIC FINDINGS:\n")
-  high_benefit_national <- status_impact %>% filter(national_pct_improved >= 60) %>% pull(status)
-  high_benefit_acuity <- status_impact %>% filter(acuity_pct_improved >= 60) %>% pull(status)
-  
-  if(length(high_benefit_national) > 0) {
-    cat(sprintf("- High benefit from National system: %s\n", paste(high_benefit_national, collapse = ", ")))
-  }
-  if(length(high_benefit_acuity) > 0) {
-    cat(sprintf("- High benefit from Acuity Circle system: %s\n", paste(high_benefit_acuity, collapse = ", ")))
-  }
-  
-  cat("\n3. GEOGRAPHIC FINDINGS:\n")
-  close_distance <- distance_impact %>% filter(distance_category == "≤250 NM")
-  far_distance <- distance_impact %>% filter(distance_category == ">2500 NM")
-  
-  if(nrow(close_distance) > 0) {
-    cat(sprintf("- Close distance candidates (≤250 NM): %.1f%% favor National, %.1f%% favor Acuity Circle\n",
-                close_distance$pct_national_advantage, close_distance$pct_acuity_advantage))
-  }
-  if(nrow(far_distance) > 0) {
-    cat(sprintf("- Far distance candidates (>2500 NM): %.1f%% favor National, %.1f%% favor Acuity Circle\n",
-                far_distance$pct_national_advantage, far_distance$pct_acuity_advantage))
-  }
-  
-  cat("\n4. RISK STRATIFICATION:\n")
-  cat("- All systems show inverse relationship between sequence position and US-CRS score\n")
-  cat("- US-CRS based systems demonstrate improved risk stratification vs current system\n")
-  
-  cat(sprintf("\nAnalysis completed: %s\n", Sys.time()))
-  cat("Visualizations saved to results/ directory\n")
-  
-} else {
-  cat("Summary report not available - missing required datasets\n")
-  cat("Please ensure all counterfactual allocation scripts have been run:\n")
-  cat("1. national_uscrs_allocation.Rmd\n") 
-  cat("2. acuity_circle_uscrs.Rmd\n")
-}
-```
-
-# Save Analysis Results
-
-```{r save-results}
-if(exists("sequence_comparison")) {
-  # Save comprehensive comparison data
-  write_csv(sequence_comparison, here("data", "comprehensive_system_comparison.csv"))
-  
-  if(exists("status_impact")) {
-    write_csv(status_impact, here("data", "status_specific_impact_analysis.csv"))
-  }
-  
-  if(exists("distance_impact")) {
-    write_csv(distance_impact, here("data", "distance_impact_analysis.csv"))
-  }
-  
-  print("Analysis datasets saved to data/ directory")
-  print("All visualizations saved to results/ directory")
-  
-} else {
-  print("No analysis results to save - missing input datasets")
-}
-```
