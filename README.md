@@ -12,7 +12,7 @@ The current US heart allocation system uses therapy defined status levels to all
 
 ![Current categorical status systems](references/six_status_system.png)
 
-There is wide heterogenity of patient risk within each status 
+There is wide heterogenity of patient risk within each status. The ![US-CRS score](https://jamanetwork.com/journals/jama/fullarticle/2814884) is a multivariable urgency score for risk of death without a transplant that is based on candidate labs and mechanical circulatory support type. 
 ![US-CRS distribution by status](references/US_CRS_distribution.png)
 
 
