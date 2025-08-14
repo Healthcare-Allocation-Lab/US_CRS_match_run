@@ -6,6 +6,42 @@ Counterfactual analysis of US heart allocation comparing the current therapy-bas
 
 This project simulates heart allocation match runs to evaluate how outcomes would change under a US-CRS-based allocation system. The analysis uses 2024 SRTR heart match run data to compare allocation efficiency and candidate prioritization between current and proposed policies.
 
+## US-CRS Status Mapping
+
+The current US heart allocation system uses therapy defined status levels to allocate donor hearts. 
+
+![Current categorical status systems](references/six_status_system.png)
+
+There is wide heterogenity of patient risk within each status 
+![US-CRS distribution by status](references/US_CRS_distribution.png)
+
+
+The proposed allocation replaces the adult therapy-based statuses with continuous US-CRS scores:
+
+| Status | US-CRS Range | Description |
+|--------|-------------|-------------|
+| Status 1 | ≥49 | Highest priority |
+| Status 2 | 40-48 | High priority |
+| Status 3 | 30-38 | Moderate-high priority |
+| Status 4 | 20-28 | Moderate priority |
+| Status 5 | 10-18 | Lower priority |
+| Status 6 | 0-9 | Lowest priority |
+
+## Required Data Files
+
+### SRTR Data (place in `data/` folder)
+- `ptr_hr_20240101_20241231_pub.sas7bdat` - 2024 heart match run data
+- `cand_thor.sas7bdat` - Heart candidate data
+- `donor_deceased.sas7bdat` - Deceased donor data  
+- `tx_hr.sas7bdat` - Heart transplant data
+- `us_crs_history.Rdata` - Time-varying US-CRS scores
+
+### Reference Materials (included)
+- `references/heart_allocation_sequence.pdf` - OPTN allocation policy
+- `references/jama_zhang_2024_*.pdf` - US-CRS validation study
+- `mapping_tables/us_crs_mapping_2019_2021.csv` - Score conversion table
+
+
 ## Project Setup
 
 ### Prerequisites
@@ -82,34 +118,6 @@ This project uses `renv` for reproducible package management:
 - **Check status**: `renv::status()` shows package synchronization
 - **Documentation**: See `renv_setup.md` for detailed usage
 
-## US-CRS Status Mapping
-
-The proposed allocation replaces therapy-based statuses with continuous US-CRS scores:
-
-| Status | US-CRS Range | Description |
-|--------|-------------|-------------|
-| Status 1 | ≥49 | Highest priority |
-| Status 2 | 40-49 | High priority |
-| Status 3 | 30-39 | Moderate-high priority |
-| Status 4 | 20-29 | Moderate priority |
-| Status 5 | 10-19 | Lower priority |
-| Status 6 | 0-9 | Lowest priority |
-
-![US-CRS distribution by status](references/US_CRS_distribution.png)
-
-## Required Data Files
-
-### SRTR Data (place in `data/` folder)
-- `ptr_hr_20240101_20241231_pub.sas7bdat` - 2024 heart match run data
-- `cand_thor.sas7bdat` - Heart candidate data
-- `donor_deceased.sas7bdat` - Deceased donor data  
-- `tx_hr.sas7bdat` - Heart transplant data
-- `us_crs_history.Rdata` - Time-varying US-CRS scores
-
-### Reference Materials (included)
-- `references/heart_allocation_sequence.pdf` - OPTN allocation policy
-- `references/jama_zhang_2024_*.pdf` - US-CRS validation study
-- `mapping_tables/us_crs_mapping_2019_2021.csv` - Score conversion table
 
 ## Analysis Workflow
 
