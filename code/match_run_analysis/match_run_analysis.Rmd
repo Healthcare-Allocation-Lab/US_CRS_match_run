@@ -518,7 +518,6 @@ if(exists("sequence_comparison")) {
     scale_y_continuous(labels = scales::percent_format()) +
     labs(
       title = "Candidate Status Distribution Across All Allocation Systems",
-      subtitle = "Proportion of candidates by current heart status across sequence positions (Top 100)",
       x = "Sequence Position (Lower = Higher Priority)",
       y = "Proportion of Candidates"
     ) +
@@ -578,7 +577,6 @@ if(exists("sequence_comparison")) {
     scale_y_continuous(labels = scales::percent_format()) +
     labs(
       title = "Candidate Status Distribution by Allocation System",
-      subtitle = "Proportion of candidates by status across sequence positions (Top 100)",
       x = "Sequence Position (Lower = Higher Priority)",
       y = "Proportion of Candidates"
     ) + theme_minimal()
@@ -632,6 +630,8 @@ sequence_comparison %>%
       legend.position = "bottom"
     )
   
+
+ggsave(here("results", "distance_analysis_by_sequence.pdf"), width = 12, height = 8, dpi = 300)
 ```
 
 
