@@ -187,39 +187,38 @@ assign_uscrs_classification <- function(match_data) {
            candidate_age_category == "pediatric" & pediatric_status == "2") & 
            blood_compatibility == "secondary" & PTR_DISTANCE <= 250 ~ "a20",
           
-          # Class 21-22: Status 4, 500NM
-          candidate_age_category == "adult" & uscrs_status_numeric == 4 & 
-           blood_compatibility == "primary" & PTR_DISTANCE <= 500 ~ "a21",
-          candidate_age_category == "adult" & uscrs_status_numeric == 4 & 
-           blood_compatibility == "secondary" & PTR_DISTANCE <= 500 ~ "a22",
           
-          # Class 23-24: Status 1 or Ped 1A, 1500NM
+          # Class 21-22: Status 1 or Ped 1A, 1500NM
           (candidate_age_category == "adult" & uscrs_status_numeric == 1 |
            candidate_age_category == "pediatric" & pediatric_status == "1A") & 
+           blood_compatibility == "primary" & PTR_DISTANCE <= 1500 ~ "a21",
+          (candidate_age_category == "adult" & uscrs_status_numeric == 1 |
+           candidate_age_category == "pediatric" & pediatric_status == "1A") & 
+           blood_compatibility == "secondary" & PTR_DISTANCE <= 1500 ~ "a22",
+          
+          # Class 23-24: Status 2, 1500NM  
+          candidate_age_category == "adult" & uscrs_status_numeric == 2 & 
            blood_compatibility == "primary" & PTR_DISTANCE <= 1500 ~ "a23",
-          (candidate_age_category == "adult" & uscrs_status_numeric == 1 |
-           candidate_age_category == "pediatric" & pediatric_status == "1A") & 
+          candidate_age_category == "adult" & uscrs_status_numeric == 2 & 
            blood_compatibility == "secondary" & PTR_DISTANCE <= 1500 ~ "a24",
-          
-          # Class 25-26: Status 2, 1500NM  
-          candidate_age_category == "adult" & uscrs_status_numeric == 2 & 
+           
+          # Class 25-26: Status 3 or Ped 1B, 1500NM
+          (candidate_age_category == "adult" & uscrs_status_numeric == 3 |
+           candidate_age_category == "pediatric" & pediatric_status == "1B") & 
            blood_compatibility == "primary" & PTR_DISTANCE <= 1500 ~ "a25",
-          candidate_age_category == "adult" & uscrs_status_numeric == 2 & 
+          (candidate_age_category == "adult" & uscrs_status_numeric == 3 |
+           candidate_age_category == "pediatric" & pediatric_status == "1B") & 
            blood_compatibility == "secondary" & PTR_DISTANCE <= 1500 ~ "a26",
-          
-          # Class 27-28: Status 5, 500NM
-          candidate_age_category == "adult" & uscrs_status_numeric == 5 & 
+          # Class 27-28: Status 4, 500NM
+          candidate_age_category == "adult" & uscrs_status_numeric == 4 & 
            blood_compatibility == "primary" & PTR_DISTANCE <= 500 ~ "a27",
-          candidate_age_category == "adult" & uscrs_status_numeric == 5 & 
+          candidate_age_category == "adult" & uscrs_status_numeric == 4 & 
            blood_compatibility == "secondary" & PTR_DISTANCE <= 500 ~ "a28",
-          
-          # Class 29-30: Status 3 or Ped 1B, 1500NM
-          (candidate_age_category == "adult" & uscrs_status_numeric == 3 |
-           candidate_age_category == "pediatric" & pediatric_status == "1B") & 
-           blood_compatibility == "primary" & PTR_DISTANCE <= 1500 ~ "a29",
-          (candidate_age_category == "adult" & uscrs_status_numeric == 3 |
-           candidate_age_category == "pediatric" & pediatric_status == "1B") & 
-           blood_compatibility == "secondary" & PTR_DISTANCE <= 1500 ~ "a30",
+          # Class 29-30: Status 5, 500NM
+          candidate_age_category == "adult" & uscrs_status_numeric == 5 & 
+           blood_compatibility == "primary" & PTR_DISTANCE <= 500 ~ "a29",
+          candidate_age_category == "adult" & uscrs_status_numeric == 5 & 
+           blood_compatibility == "secondary" & PTR_DISTANCE <= 500 ~ "a30",
           
           # Class 31-32: Status 6 or Ped 2, 500NM
           (candidate_age_category == "adult" & uscrs_status_numeric == 6 |
@@ -229,39 +228,41 @@ assign_uscrs_classification <- function(match_data) {
            candidate_age_category == "pediatric" & pediatric_status == "2") & 
            blood_compatibility == "secondary" & PTR_DISTANCE <= 500 ~ "a32",
           
-          # Class 33-34: Status 4, 1000NM
-          candidate_age_category == "adult" & uscrs_status_numeric == 4 & 
-           blood_compatibility == "primary" & PTR_DISTANCE <= 1000 ~ "a33",
-          candidate_age_category == "adult" & uscrs_status_numeric == 4 & 
-           blood_compatibility == "secondary" & PTR_DISTANCE <= 1000 ~ "a34",
-          
-          # Class 35-36: Status 1 or Ped 1A, 2500NM
+    
+          # Class 33-34: Status 1 or Ped 1A, 2500NM
           (candidate_age_category == "adult" & uscrs_status_numeric == 1 |
            candidate_age_category == "pediatric" & pediatric_status == "1A") & 
+           blood_compatibility == "primary" & PTR_DISTANCE <= 2500 ~ "a33",
+          (candidate_age_category == "adult" & uscrs_status_numeric == 1 |
+           candidate_age_category == "pediatric" & pediatric_status == "1A") & 
+           blood_compatibility == "secondary" & PTR_DISTANCE <= 2500 ~ "a34",
+          
+          # Class 35-36: Status 2, 2500NM
+          candidate_age_category == "adult" & uscrs_status_numeric == 2 & 
            blood_compatibility == "primary" & PTR_DISTANCE <= 2500 ~ "a35",
-          (candidate_age_category == "adult" & uscrs_status_numeric == 1 |
-           candidate_age_category == "pediatric" & pediatric_status == "1A") & 
+          candidate_age_category == "adult" & uscrs_status_numeric == 2 & 
            blood_compatibility == "secondary" & PTR_DISTANCE <= 2500 ~ "a36",
+
           
-          # Class 37-38: Status 2, 2500NM
-          candidate_age_category == "adult" & uscrs_status_numeric == 2 & 
+          # Class 37-38: Status 3 or Ped 1B, 2500NM
+          (candidate_age_category == "adult" & uscrs_status_numeric == 3 |
+           candidate_age_category == "pediatric" & pediatric_status == "1B") & 
            blood_compatibility == "primary" & PTR_DISTANCE <= 2500 ~ "a37",
-          candidate_age_category == "adult" & uscrs_status_numeric == 2 & 
+          (candidate_age_category == "adult" & uscrs_status_numeric == 3 |
+           candidate_age_category == "pediatric" & pediatric_status == "1B") & 
            blood_compatibility == "secondary" & PTR_DISTANCE <= 2500 ~ "a38",
           
-          # Class 39-40: Status 5, 1000NM
-          candidate_age_category == "adult" & uscrs_status_numeric == 5 & 
+          # Class 39-40: Status 4, 1000NM
+          candidate_age_category == "adult" & uscrs_status_numeric == 4 & 
            blood_compatibility == "primary" & PTR_DISTANCE <= 1000 ~ "a39",
-          candidate_age_category == "adult" & uscrs_status_numeric == 5 & 
+          candidate_age_category == "adult" & uscrs_status_numeric == 4 & 
            blood_compatibility == "secondary" & PTR_DISTANCE <= 1000 ~ "a40",
           
-          # Class 41-42: Status 3 or Ped 1B, 2500NM
-          (candidate_age_category == "adult" & uscrs_status_numeric == 3 |
-           candidate_age_category == "pediatric" & pediatric_status == "1B") & 
-           blood_compatibility == "primary" & PTR_DISTANCE <= 2500 ~ "a41",
-          (candidate_age_category == "adult" & uscrs_status_numeric == 3 |
-           candidate_age_category == "pediatric" & pediatric_status == "1B") & 
-           blood_compatibility == "secondary" & PTR_DISTANCE <= 2500 ~ "a42",
+          # Class 41-42: Status 5, 1000NM
+          candidate_age_category == "adult" & uscrs_status_numeric == 5 & 
+           blood_compatibility == "primary" & PTR_DISTANCE <= 1000 ~ "a41",
+          candidate_age_category == "adult" & uscrs_status_numeric == 5 & 
+           blood_compatibility == "secondary" & PTR_DISTANCE <= 1000 ~ "a42",
           
           # Class 43-44: Status 6 or Ped 2, 1000NM
           (candidate_age_category == "adult" & uscrs_status_numeric == 6 |
@@ -271,40 +272,41 @@ assign_uscrs_classification <- function(match_data) {
            candidate_age_category == "pediatric" & pediatric_status == "2") & 
            blood_compatibility == "secondary" & PTR_DISTANCE <= 1000 ~ "a44",
           
-          # Class 45-46: Status 4, 1500NM
-          candidate_age_category == "adult" & uscrs_status_numeric == 4 & 
-           blood_compatibility == "primary" & PTR_DISTANCE <= 1500 ~ "a45",
-          candidate_age_category == "adult" & uscrs_status_numeric == 4 & 
-           blood_compatibility == "secondary" & PTR_DISTANCE <= 1500 ~ "a46",
           
-          # Class 47-48: Status 1 or Ped 1A, Nation
+          
+          # Class 45-46: Status 1 or Ped 1A, Nation
           (candidate_age_category == "adult" & uscrs_status_numeric == 1 |
            candidate_age_category == "pediatric" & pediatric_status == "1A") & 
+           blood_compatibility == "primary"  ~ "a45",
+          (candidate_age_category == "adult" & uscrs_status_numeric == 1 |
+           candidate_age_category == "pediatric" & pediatric_status == "1A") & 
+           blood_compatibility == "secondary"  ~ "a46",
+          
+          # Class 47-48: Status 2, Nation
+          candidate_age_category == "adult" & uscrs_status_numeric == 2 & 
            blood_compatibility == "primary"  ~ "a47",
-          (candidate_age_category == "adult" & uscrs_status_numeric == 1 |
-           candidate_age_category == "pediatric" & pediatric_status == "1A") & 
+          candidate_age_category == "adult" & uscrs_status_numeric == 2 & 
            blood_compatibility == "secondary"  ~ "a48",
           
-          # Class 49-50: Status 2, Nation
-          candidate_age_category == "adult" & uscrs_status_numeric == 2 & 
+          
+          # Class 49-50: Status 3 or Ped 1B, Nation
+          (candidate_age_category == "adult" & uscrs_status_numeric == 3 |
+           candidate_age_category == "pediatric" & pediatric_status == "1B") & 
            blood_compatibility == "primary"  ~ "a49",
-          candidate_age_category == "adult" & uscrs_status_numeric == 2 & 
+          (candidate_age_category == "adult" & uscrs_status_numeric == 3 |
+           candidate_age_category == "pediatric" & pediatric_status == "1B") & 
            blood_compatibility == "secondary"  ~ "a50",
           
-          # Class 51-52: Status 5, 1500NM
-          candidate_age_category == "adult" & uscrs_status_numeric == 5 & 
+          # Class 51-52: Status 4, 1500NM
+          candidate_age_category == "adult" & uscrs_status_numeric == 4 & 
            blood_compatibility == "primary" & PTR_DISTANCE <= 1500 ~ "a51",
-          candidate_age_category == "adult" & uscrs_status_numeric == 5 & 
+          candidate_age_category == "adult" & uscrs_status_numeric == 4 & 
            blood_compatibility == "secondary" & PTR_DISTANCE <= 1500 ~ "a52",
-          
-          # Class 53-54: Status 3 or Ped 1B, Nation
-          (candidate_age_category == "adult" & uscrs_status_numeric == 3 |
-           candidate_age_category == "pediatric" & pediatric_status == "1B") & 
-           blood_compatibility == "primary"  ~ "a53",
-          (candidate_age_category == "adult" & uscrs_status_numeric == 3 |
-           candidate_age_category == "pediatric" & pediatric_status == "1B") & 
-           blood_compatibility == "secondary"  ~ "a54",
-          
+          # Class 53-54: Status 5, 1500NM
+          candidate_age_category == "adult" & uscrs_status_numeric == 5 & 
+           blood_compatibility == "primary" & PTR_DISTANCE <= 1500 ~ "a53",
+          candidate_age_category == "adult" & uscrs_status_numeric == 5 & 
+           blood_compatibility == "secondary" & PTR_DISTANCE <= 1500 ~ "a54",
           # Class 55-56: Status 6 or Ped 2, 1500NM
           (candidate_age_category == "adult" & uscrs_status_numeric == 6 |
            candidate_age_category == "pediatric" & pediatric_status == "2") & 
@@ -364,305 +366,313 @@ assign_uscrs_classification <- function(match_data) {
           candidate_age_category == "pediatric" & pediatric_status == "1A" & 
            blood_compatibility == "secondary" & PTR_DISTANCE <= 500 ~ "p2",
           
-          # Class 71-72: Adult Status 1, 500NM (after pediatric 1A)
+          # Class 71-72: Adult Status 1, 250NM (after pediatric 1A)
           candidate_age_category == "adult" & uscrs_status_numeric == 1 & 
-           blood_compatibility == "primary" & PTR_DISTANCE <= 500 ~ "p3",
+           blood_compatibility == "primary" & PTR_DISTANCE <= 250 ~ "p3",
           candidate_age_category == "adult" & uscrs_status_numeric == 1 & 
-           blood_compatibility == "secondary" & PTR_DISTANCE <= 500 ~ "p4",
-          
-          # Class 73-74: Ped 1A, 1000NM (pediatric priority)
-          candidate_age_category == "pediatric" & pediatric_status == "1A" & 
-           blood_compatibility == "primary" & PTR_DISTANCE <= 1000 ~ "p5",
-          candidate_age_category == "pediatric" & pediatric_status == "1A" & 
-           blood_compatibility == "secondary" & PTR_DISTANCE <= 1000 ~ "p6",
-          
-          # Class 75-76: Adult Status 1, 1000NM (after pediatric 1A)
-          candidate_age_category == "adult" & uscrs_status_numeric == 1 & 
-           blood_compatibility == "primary" & PTR_DISTANCE <= 1000 ~ "p7",
-          candidate_age_category == "adult" & uscrs_status_numeric == 1 & 
-           blood_compatibility == "secondary" & PTR_DISTANCE <= 1000 ~ "p8",
-          
-          # Class 77-78: Adult Status 2, 500NM
+           blood_compatibility == "secondary" & PTR_DISTANCE <= 250 ~ "p4",
+           # Class 73-74: Adult Status 2, 250NM (after pediatric 1A)
           candidate_age_category == "adult" & uscrs_status_numeric == 2 & 
+           blood_compatibility == "primary" & PTR_DISTANCE <= 250 ~ "p5",
+          candidate_age_category == "adult" & uscrs_status_numeric == 2 & 
+           blood_compatibility == "secondary" & PTR_DISTANCE <= 250 ~ "p6",
+          
+          # Class 75-76: Ped 1B, 500NM (pediatric priority)
+          candidate_age_category == "pediatric" & pediatric_status == "1B" & 
+           blood_compatibility == "primary" & PTR_DISTANCE <= 500 ~ "p7",
+          candidate_age_category == "pediatric" & pediatric_status == "1B" & 
+           blood_compatibility == "secondary" & PTR_DISTANCE <= 500 ~ "p8",
+          
+          # Class 77-78: Adult Status 1, 500NM (after pediatric 1A)
+          candidate_age_category == "adult" & uscrs_status_numeric == 1 & 
            blood_compatibility == "primary" & PTR_DISTANCE <= 500 ~ "p9",
-          candidate_age_category == "adult" & uscrs_status_numeric == 2 & 
+          candidate_age_category == "adult" & uscrs_status_numeric == 1 & 
            blood_compatibility == "secondary" & PTR_DISTANCE <= 500 ~ "p10",
           
-          # Class 79-80: Ped 1B, 250NM (pediatric priority)
-          candidate_age_category == "pediatric" & pediatric_status == "1B" & 
-           blood_compatibility == "primary" & PTR_DISTANCE <= 250 ~ "p11",
-          candidate_age_category == "pediatric" & pediatric_status == "1B" & 
-           blood_compatibility == "secondary" & PTR_DISTANCE <= 250 ~ "p12",
+          # Class 79-80: Adult Status 2, 500NM
+          candidate_age_category == "adult" & uscrs_status_numeric == 2 & 
+           blood_compatibility == "primary" & PTR_DISTANCE <= 500 ~ "p11",
+          candidate_age_category == "adult" & uscrs_status_numeric == 2 & 
+           blood_compatibility == "secondary" & PTR_DISTANCE <= 500 ~ "p12",
           
-          # Class 81-82: Adult Status 3, 250NM (after pediatric 1B)
+          # Class 81-82: Adult Status 3, 250NM 
           candidate_age_category == "adult" & uscrs_status_numeric == 3 & 
            blood_compatibility == "primary" & PTR_DISTANCE <= 250 ~ "p13",
           candidate_age_category == "adult" & uscrs_status_numeric == 3 & 
            blood_compatibility == "secondary" & PTR_DISTANCE <= 250 ~ "p14",
           
-          # Class 83-84: Ped 1A, 1500NM (pediatric priority)
-          candidate_age_category == "pediatric" & pediatric_status == "1A" & 
-           blood_compatibility == "primary" & PTR_DISTANCE <= 1500 ~ "p15",
-          candidate_age_category == "pediatric" & pediatric_status == "1A" & 
-           blood_compatibility == "secondary" & PTR_DISTANCE <= 1500 ~ "p16",
-          
-          # Class 85-86: Adult Status 1, 1500NM (after pediatric 1A)
-          candidate_age_category == "adult" & uscrs_status_numeric == 1 & 
-           blood_compatibility == "primary" & PTR_DISTANCE <= 1500 ~ "p17",
-          candidate_age_category == "adult" & uscrs_status_numeric == 1 & 
-           blood_compatibility == "secondary" & PTR_DISTANCE <= 1500 ~ "p18",
-          
-          # Class 87-88: Adult Status 2, 1000NM
-          candidate_age_category == "adult" & uscrs_status_numeric == 2 & 
-           blood_compatibility == "primary" & PTR_DISTANCE <= 1000 ~ "p19",
-          candidate_age_category == "adult" & uscrs_status_numeric == 2 & 
-           blood_compatibility == "secondary" & PTR_DISTANCE <= 1000 ~ "p20",
-          
-          # Class 89-90: Adult Status 4, 250NM
+           # Class 83-84: Adult Status 4, 250NM
           candidate_age_category == "adult" & uscrs_status_numeric == 4 & 
-           blood_compatibility == "primary" & PTR_DISTANCE <= 250 ~ "p21",
+           blood_compatibility == "primary" & PTR_DISTANCE <= 250 ~ "p15",
           candidate_age_category == "adult" & uscrs_status_numeric == 4 & 
-           blood_compatibility == "secondary" & PTR_DISTANCE <= 250 ~ "p22",
+           blood_compatibility == "secondary" & PTR_DISTANCE <= 250 ~ "p16",
           
-          # Class 91-92: Ped 1B, 500NM (pediatric priority)
-          candidate_age_category == "pediatric" & pediatric_status == "1B" & 
-           blood_compatibility == "primary" & PTR_DISTANCE <= 500 ~ "p23",
-          candidate_age_category == "pediatric" & pediatric_status == "1B" & 
-           blood_compatibility == "secondary" & PTR_DISTANCE <= 500 ~ "p24",
-          
-          # Class 93-94: Adult Status 3, 500NM (after pediatric 1B)
-          candidate_age_category == "adult" & uscrs_status_numeric == 3 & 
-           blood_compatibility == "primary" & PTR_DISTANCE <= 500 ~ "p25",
-          candidate_age_category == "adult" & uscrs_status_numeric == 3 & 
-           blood_compatibility == "secondary" & PTR_DISTANCE <= 500 ~ "p26",
-          
-          # Class 95-96: Adult Status 5, 250NM
+          # Class 85-86: Adult Status 5, 250NM
           candidate_age_category == "adult" & uscrs_status_numeric == 5 & 
+           blood_compatibility == "primary" & PTR_DISTANCE <= 250 ~ "p17",
+          candidate_age_category == "adult" & uscrs_status_numeric == 1 & 
+           blood_compatibility == "secondary" & PTR_DISTANCE <= 250 ~ "p18",
+          
+          # Class 87-88: Adult Status 3, 500NM
+          candidate_age_category == "adult" & uscrs_status_numeric == 3 & 
+           blood_compatibility == "primary" & PTR_DISTANCE <= 500 ~ "p19",
+          candidate_age_category == "adult" & uscrs_status_numeric == 3 & 
+           blood_compatibility == "secondary" & PTR_DISTANCE <= 500 ~ "p20",
+          
+          # Class 89-90: Adult Status 4, 500NM
+          candidate_age_category == "adult" & uscrs_status_numeric == 4 & 
+           blood_compatibility == "primary" & PTR_DISTANCE <= 500 ~ "p21",
+          candidate_age_category == "adult" & uscrs_status_numeric == 4 & 
+           blood_compatibility == "secondary" & PTR_DISTANCE <= 500 ~ "p22",
+          
+          # Class 91-92: Adult Status 5, 500NM
+          candidate_age_category == "adult" & uscrs_status_numeric == 5 & 
+           blood_compatibility == "primary" & PTR_DISTANCE <= 500 ~ "p21",
+          candidate_age_category == "adult" & uscrs_status_numeric == 5 & 
+           blood_compatibility == "secondary" & PTR_DISTANCE <= 500 ~ "p22",
+          
+          # Class 93-94: Ped 2, 250NM (pediatric priority)
+          candidate_age_category == "pediatric" & pediatric_status == "2" & 
+           blood_compatibility == "primary" & PTR_DISTANCE <= 250 ~ "p29",
+          candidate_age_category == "pediatric" & pediatric_status == "2" & 
+           blood_compatibility == "secondary" & PTR_DISTANCE <= 250 ~ "p30",
+          
+          # Class 95-96: Adult Status 6, 250NM
+          candidate_age_category == "adult" & uscrs_status_numeric == 6 & 
            blood_compatibility == "primary" & PTR_DISTANCE <= 250 ~ "p27",
-          candidate_age_category == "adult" & uscrs_status_numeric == 5 & 
+          candidate_age_category == "adult" & uscrs_status_numeric == 6 & 
            blood_compatibility == "secondary" & PTR_DISTANCE <= 250 ~ "p28",
           
-          # Class 97-98: Ped 1B, 1000NM (pediatric priority)
-          candidate_age_category == "pediatric" & pediatric_status == "1B" & 
+          # Class 97-98: Ped 1A, 1000NM (pediatric priority)
+          candidate_age_category == "pediatric" & pediatric_status == "1A" & 
            blood_compatibility == "primary" & PTR_DISTANCE <= 1000 ~ "p29",
-          candidate_age_category == "pediatric" & pediatric_status == "1B" & 
+          candidate_age_category == "pediatric" & pediatric_status == "1A" & 
            blood_compatibility == "secondary" & PTR_DISTANCE <= 1000 ~ "p30",
           
-          # Class 99-100: Adult Status 3, 1000NM (after pediatric 1B)
-          candidate_age_category == "adult" & uscrs_status_numeric == 3 & 
+          # Class 99-100: Adult Status 1, 1000NM 
+          candidate_age_category == "adult" & uscrs_status_numeric == 1 & 
            blood_compatibility == "primary" & PTR_DISTANCE <= 1000 ~ "p31",
-          candidate_age_category == "adult" & uscrs_status_numeric == 3 & 
+          candidate_age_category == "adult" & uscrs_status_numeric == 1 & 
            blood_compatibility == "secondary" & PTR_DISTANCE <= 1000 ~ "p32",
           
-          # Class 101-102: Ped 2, 250NM (pediatric priority)
-          candidate_age_category == "pediatric" & pediatric_status == "2" & 
-           blood_compatibility == "primary" & PTR_DISTANCE <= 250 ~ "p33",
-          candidate_age_category == "pediatric" & pediatric_status == "2" & 
-           blood_compatibility == "secondary" & PTR_DISTANCE <= 250 ~ "p34",
-          
-          # Class 103-104: Adult Status 6, 250NM (after pediatric 2)
-          candidate_age_category == "adult" & uscrs_status_numeric == 6 & 
-           blood_compatibility == "primary" & PTR_DISTANCE <= 250 ~ "p35",
-          candidate_age_category == "adult" & uscrs_status_numeric == 6 & 
-           blood_compatibility == "secondary" & PTR_DISTANCE <= 250 ~ "p36",
-          
-          # Class 105-106: Ped 1A, 2500NM (pediatric priority)
-          candidate_age_category == "pediatric" & pediatric_status == "1A" & 
-           blood_compatibility == "primary" & PTR_DISTANCE <= 2500 ~ "p37",
-          candidate_age_category == "pediatric" & pediatric_status == "1A" & 
-           blood_compatibility == "secondary" & PTR_DISTANCE <= 2500 ~ "p38",
-          
-          # Class 107-108: Adult Status 1, 2500NM (after pediatric 1A)
-          candidate_age_category == "adult" & uscrs_status_numeric == 1 & 
-           blood_compatibility == "primary" & PTR_DISTANCE <= 2500 ~ "p39",
-          candidate_age_category == "adult" & uscrs_status_numeric == 1 & 
-           blood_compatibility == "secondary" & PTR_DISTANCE <= 2500 ~ "p40",
-          
-          # Class 109-110: Adult Status 2, 1500NM
+           # Class 101-102: Adult Status 2, 1000NM 
           candidate_age_category == "adult" & uscrs_status_numeric == 2 & 
-           blood_compatibility == "primary" & PTR_DISTANCE <= 1500 ~ "p41",
+           blood_compatibility == "primary" & PTR_DISTANCE <= 1000 ~ "p33",
           candidate_age_category == "adult" & uscrs_status_numeric == 2 & 
-           blood_compatibility == "secondary" & PTR_DISTANCE <= 1500 ~ "p42",
+           blood_compatibility == "secondary" & PTR_DISTANCE <= 1000 ~ "p34",
           
-          # Class 111-112: Adult Status 4, 500NM
+          # Class 103-104: Ped 1B, 250NM (pediatric priority)
+          candidate_age_category == "pediatric" & pediatric_status == "1B" & 
+           blood_compatibility == "primary" & PTR_DISTANCE <= 1000 ~ "p35",
+          candidate_age_category == "pediatric" & pediatric_status == "1B" & 
+           blood_compatibility == "secondary" & PTR_DISTANCE <= 1000 ~ "p36",
+          
+          # Class 105-106: Adult Status 3, 1000NM 
+          candidate_age_category == "adult" & uscrs_status_numeric == 3 & 
+           blood_compatibility == "primary" & PTR_DISTANCE <= 1000 ~ "p37",
+          candidate_age_category == "adult" & uscrs_status_numeric == 3 & 
+           blood_compatibility == "secondary" & PTR_DISTANCE <= 1000 ~ "p38",
+          
+          
+          # Class 107-108: Adult Status 4, 1000NM 
           candidate_age_category == "adult" & uscrs_status_numeric == 4 & 
+           blood_compatibility == "primary" & PTR_DISTANCE <= 1000 ~ "p39",
+          candidate_age_category == "adult" & uscrs_status_numeric == 4 & 
+           blood_compatibility == "secondary" & PTR_DISTANCE <= 1000 ~ "p40",
+          
+          # Class 109-110: Adult Status 5, 1000NM
+          candidate_age_category == "adult" & uscrs_status_numeric == 5 & 
+           blood_compatibility == "primary" & PTR_DISTANCE <= 1000 ~ "p41",
+          candidate_age_category == "adult" & uscrs_status_numeric == 5 & 
+           blood_compatibility == "secondary" & PTR_DISTANCE <= 1000 ~ "p42",
+          
+          # Class 111-112: Ped 2, 500NM (pediatric priority)
+          candidate_age_category == "pediatric" & pediatric_status == "2" & 
            blood_compatibility == "primary" & PTR_DISTANCE <= 500 ~ "p43",
-          candidate_age_category == "adult" & uscrs_status_numeric == 4 & 
+          candidate_age_category == "pediatric" & pediatric_status == "2" & 
            blood_compatibility == "secondary" & PTR_DISTANCE <= 500 ~ "p44",
           
-          # Class 113-114: Ped 1B, 1500NM (pediatric priority)
-          candidate_age_category == "pediatric" & pediatric_status == "1B" & 
-           blood_compatibility == "primary" & PTR_DISTANCE <= 1500 ~ "p45",
-          candidate_age_category == "pediatric" & pediatric_status == "1B" & 
-           blood_compatibility == "secondary" & PTR_DISTANCE <= 1500 ~ "p46",
-          
-          # Class 115-116: Adult Status 3, 1500NM (after pediatric 1B)
-          candidate_age_category == "adult" & uscrs_status_numeric == 3 & 
-           blood_compatibility == "primary" & PTR_DISTANCE <= 1500 ~ "p47",
-          candidate_age_category == "adult" & uscrs_status_numeric == 3 & 
-           blood_compatibility == "secondary" & PTR_DISTANCE <= 1500 ~ "p48",
-          
-          # Class 117-118: Adult Status 5, 500NM
-          candidate_age_category == "adult" & uscrs_status_numeric == 5 & 
-           blood_compatibility == "primary" & PTR_DISTANCE <= 500 ~ "p49",
-          candidate_age_category == "adult" & uscrs_status_numeric == 5 & 
-           blood_compatibility == "secondary" & PTR_DISTANCE <= 500 ~ "p50",
-          
-          # Class 119-120: Ped 2, 500NM (pediatric priority)
-          candidate_age_category == "pediatric" & pediatric_status == "2" & 
-           blood_compatibility == "primary" & PTR_DISTANCE <= 500 ~ "p51",
-          candidate_age_category == "pediatric" & pediatric_status == "2" & 
-           blood_compatibility == "secondary" & PTR_DISTANCE <= 500 ~ "p52",
-          
-          # Class 121-122: Adult Status 6, 500NM (after pediatric 2)
+          # Class 113-114: Adult Status 6, 500NM
           candidate_age_category == "adult" & uscrs_status_numeric == 6 & 
-           blood_compatibility == "primary" & PTR_DISTANCE <= 500 ~ "p53",
+           blood_compatibility == "primary" & PTR_DISTANCE <= 500 ~ "p45",
           candidate_age_category == "adult" & uscrs_status_numeric == 6 & 
-           blood_compatibility == "secondary" & PTR_DISTANCE <= 500 ~ "p54",
+           blood_compatibility == "secondary" & PTR_DISTANCE <= 500 ~ "p46",
           
-          # Class 123-124: Adult Status 4, 1000NM
-          candidate_age_category == "adult" & uscrs_status_numeric == 4 & 
-           blood_compatibility == "primary" & PTR_DISTANCE <= 1000 ~ "p55",
-          candidate_age_category == "adult" & uscrs_status_numeric == 4 & 
-           blood_compatibility == "secondary" & PTR_DISTANCE <= 1000 ~ "p56",
+          # Class 115-116: Ped 2, 1000NM (pediatric priority)
+          candidate_age_category == "pediatric" & pediatric_status == "2" & 
+           blood_compatibility == "primary" & PTR_DISTANCE <= 1000 ~ "p47",
+          candidate_age_category == "pediatric" & pediatric_status == "2" & 
+           blood_compatibility == "secondary" & PTR_DISTANCE <= 1000 ~ "p48",
           
-          # Class 125-126: Ped 1A, Nation (pediatric priority)
+          # Class 117-118: Adult Status 6, 1000NM
+          candidate_age_category == "adult" & uscrs_status_numeric == 6 & 
+           blood_compatibility == "primary" & PTR_DISTANCE <= 1000 ~ "p49",
+          candidate_age_category == "adult" & uscrs_status_numeric == 6 & 
+           blood_compatibility == "secondary" & PTR_DISTANCE <= 1000 ~ "p50",
+          
+          
+          # Class 119-120: Ped 1A, 1500NM (pediatric priority)
           candidate_age_category == "pediatric" & pediatric_status == "1A" & 
-           blood_compatibility == "primary"  ~ "p57",
+           blood_compatibility == "primary" & PTR_DISTANCE <= 1500 ~ "p51",
           candidate_age_category == "pediatric" & pediatric_status == "1A" & 
-           blood_compatibility == "secondary"  ~ "p58",
+           blood_compatibility == "secondary" & PTR_DISTANCE <= 1500 ~ "p52",
           
-          # Class 127-128: Adult Status 1, Nation (after pediatric 1A)
+          # Class 121-122: Adult Status 1, 1500NM 
           candidate_age_category == "adult" & uscrs_status_numeric == 1 & 
-           blood_compatibility == "primary"  ~ "p59",
+           blood_compatibility == "primary" & PTR_DISTANCE <= 1500 ~ "p53",
           candidate_age_category == "adult" & uscrs_status_numeric == 1 & 
-           blood_compatibility == "secondary"  ~ "p60",
+           blood_compatibility == "secondary" & PTR_DISTANCE <= 1500 ~ "p54",
           
-          # Class 129-130: Adult Status 2, 2500NM
+          # Class 123-124: Adult Status 2, 1500NM
           candidate_age_category == "adult" & uscrs_status_numeric == 2 & 
-           blood_compatibility == "primary" & PTR_DISTANCE <= 2500 ~ "p61",
+           blood_compatibility == "primary" & PTR_DISTANCE <= 1500 ~ "p55",
           candidate_age_category == "adult" & uscrs_status_numeric == 2 & 
-           blood_compatibility == "secondary" & PTR_DISTANCE <= 2500 ~ "p62",
+           blood_compatibility == "secondary" & PTR_DISTANCE <= 1500 ~ "p56",
           
-          # Class 131-132: Adult Status 5, 1000NM
-          candidate_age_category == "adult" & uscrs_status_numeric == 5 & 
-           blood_compatibility == "primary" & PTR_DISTANCE <= 1000 ~ "p63",
-          candidate_age_category == "adult" & uscrs_status_numeric == 5 & 
-           blood_compatibility == "secondary" & PTR_DISTANCE <= 1000 ~ "p64",
-          
-          # Class 133-134: Ped 1B, 2500NM (pediatric priority)
+          # Class 124-125: Ped 1B, 1500NM (pediatric priority)
           candidate_age_category == "pediatric" & pediatric_status == "1B" & 
-           blood_compatibility == "primary" & PTR_DISTANCE <= 2500 ~ "p65",
+           blood_compatibility == "primary" & PTR_DISTANCE <= 1500 ~ "p57",
           candidate_age_category == "pediatric" & pediatric_status == "1B" & 
-           blood_compatibility == "secondary" & PTR_DISTANCE <= 2500 ~ "p66",
+           blood_compatibility == "secondary" & PTR_DISTANCE <= 1500 ~ "p58",
           
-          # Class 135-136: Adult Status 3, 2500NM (after pediatric 1B)
+          # Class 125-126: Adult Status 3, 1500NM
           candidate_age_category == "adult" & uscrs_status_numeric == 3 & 
-           blood_compatibility == "primary" & PTR_DISTANCE <= 2500 ~ "p67",
+           blood_compatibility == "primary" & PTR_DISTANCE <= 1500 ~ "p59",
           candidate_age_category == "adult" & uscrs_status_numeric == 3 & 
-           blood_compatibility == "secondary" & PTR_DISTANCE <= 2500 ~ "p68",
+           blood_compatibility == "secondary" & PTR_DISTANCE <= 1500 ~ "p60",
           
-          # Class 137-138: Ped 2, 1000NM (pediatric priority)
-          candidate_age_category == "pediatric" & pediatric_status == "2" & 
-           blood_compatibility == "primary" & PTR_DISTANCE <= 1000 ~ "p69",
-          candidate_age_category == "pediatric" & pediatric_status == "2" & 
-           blood_compatibility == "secondary" & PTR_DISTANCE <= 1000 ~ "p70",
-          
-          # Class 139-140: Adult Status 6, 1000NM (after pediatric 2)
-          candidate_age_category == "adult" & uscrs_status_numeric == 6 & 
-           blood_compatibility == "primary" & PTR_DISTANCE <= 1000 ~ "p71",
-          candidate_age_category == "adult" & uscrs_status_numeric == 6 & 
-           blood_compatibility == "secondary" & PTR_DISTANCE <= 1000 ~ "p72",
-          
-          # Class 141-142: Adult Status 4, 1500NM
+          # Class 129-130: Adult Status 4, 2500NM
           candidate_age_category == "adult" & uscrs_status_numeric == 4 & 
-           blood_compatibility == "primary" & PTR_DISTANCE <= 1500 ~ "p73",
-          candidate_age_category == "adult" & uscrs_status_numeric == 4 & 
-           blood_compatibility == "secondary" & PTR_DISTANCE <= 1500 ~ "p74",
-          
-          # Class 143-144: Adult Status 2, Nation
+           blood_compatibility == "primary" & PTR_DISTANCE <= 1500 ~ "p61",
           candidate_age_category == "adult" & uscrs_status_numeric == 2 & 
-           blood_compatibility == "primary"  ~ "p75",
+           blood_compatibility == "secondary" & PTR_DISTANCE <= 1500 ~ "p62",
+          
+          # Class 131-132: Adult Status 5, 1500NM
+          candidate_age_category == "adult" & uscrs_status_numeric == 5 & 
+           blood_compatibility == "primary" & PTR_DISTANCE <= 1500 ~ "p63",
+          candidate_age_category == "adult" & uscrs_status_numeric == 5 & 
+           blood_compatibility == "secondary" & PTR_DISTANCE <= 1500 ~ "p64",
+          
+          
+          # Class 133-134: Ped 2, 1500NM (pediatric priority)
+          candidate_age_category == "pediatric" & pediatric_status == "2" & 
+           blood_compatibility == "primary" & PTR_DISTANCE <= 1500 ~ "p65",
+          candidate_age_category == "pediatric" & pediatric_status == "2" & 
+           blood_compatibility == "secondary" & PTR_DISTANCE <= 1500 ~ "p66",
+          
+          # Class 135-136: Adult Status 6, 1000NM
+          candidate_age_category == "adult" & uscrs_status_numeric == 6 & 
+           blood_compatibility == "primary" & PTR_DISTANCE <= 1500 ~ "p67",
+          candidate_age_category == "adult" & uscrs_status_numeric == 6 & 
+           blood_compatibility == "secondary" & PTR_DISTANCE <= 1500 ~ "p68",
+          
+          # Class 137-138: Ped 1A, 2500NM (pediatric priority)
+          candidate_age_category == "pediatric" & pediatric_status == "1A" & 
+           blood_compatibility == "primary" & PTR_DISTANCE <= 2500 ~ "p69",
+          candidate_age_category == "pediatric" & pediatric_status == "1A" & 
+           blood_compatibility == "secondary" & PTR_DISTANCE <= 2500 ~ "p70",
+          
+          # Class 139-140: Adult Status 1, 2500NM (after pediatric 2)
+          candidate_age_category == "adult" & uscrs_status_numeric == 1 & 
+           blood_compatibility == "primary" & PTR_DISTANCE <= 2500 ~ "p71",
+          candidate_age_category == "adult" & uscrs_status_numeric == 1 & 
+           blood_compatibility == "secondary" & PTR_DISTANCE <= 2500 ~ "p72",
+          
+          # Class 141-142: Adult Status 2, 2500NM
           candidate_age_category == "adult" & uscrs_status_numeric == 2 & 
-           blood_compatibility == "secondary"  ~ "p76",
+           blood_compatibility == "primary" & PTR_DISTANCE <= 2500 ~ "p73",
+          candidate_age_category == "adult" & uscrs_status_numeric == 2 & 
+           blood_compatibility == "secondary" & PTR_DISTANCE <= 2500 ~ "p74",
           
-          # Class 145-146: Adult Status 5, 1500NM
-          candidate_age_category == "adult" & uscrs_status_numeric == 5 & 
-           blood_compatibility == "primary" & PTR_DISTANCE <= 1500 ~ "p77",
-          candidate_age_category == "adult" & uscrs_status_numeric == 5 & 
-           blood_compatibility == "secondary" & PTR_DISTANCE <= 1500 ~ "p78",
-          
-          # Class 147-148: Ped 1B, Nation (pediatric priority)
+          # Class 137-138: Ped 1B, 2500NM (pediatric priority)
           candidate_age_category == "pediatric" & pediatric_status == "1B" & 
-           blood_compatibility == "primary"  ~ "p79",
+           blood_compatibility == "primary" & PTR_DISTANCE <= 2500 ~ "p75",
           candidate_age_category == "pediatric" & pediatric_status == "1B" & 
-           blood_compatibility == "secondary"  ~ "p80",
+           blood_compatibility == "secondary" & PTR_DISTANCE <= 2500 ~ "p76",
           
-          # Class 149-150: Adult Status 3, Nation (after pediatric 1B)
+          # Class 145-146: Adult Status 3, 2500NM
           candidate_age_category == "adult" & uscrs_status_numeric == 3 & 
-           blood_compatibility == "primary"  ~ "p81",
+           blood_compatibility == "primary" & PTR_DISTANCE <= 2500 ~ "p77",
           candidate_age_category == "adult" & uscrs_status_numeric == 3 & 
-           blood_compatibility == "secondary"  ~ "p82",
+           blood_compatibility == "secondary" & PTR_DISTANCE <= 2500 ~ "p78",
           
-          # Class 151-152: Ped 2, 1500NM (pediatric priority)
-          candidate_age_category == "pediatric" & pediatric_status == "2" & 
-           blood_compatibility == "primary" & PTR_DISTANCE <= 1500 ~ "p83",
-          candidate_age_category == "pediatric" & pediatric_status == "2" & 
-           blood_compatibility == "secondary" & PTR_DISTANCE <= 1500 ~ "p84",
-          
-          # Class 153-154: Adult Status 6, 1500NM (after pediatric 2)
-          candidate_age_category == "adult" & uscrs_status_numeric == 6 & 
-           blood_compatibility == "primary" & PTR_DISTANCE <= 1500 ~ "p85",
-          candidate_age_category == "adult" & uscrs_status_numeric == 6 & 
-           blood_compatibility == "secondary" & PTR_DISTANCE <= 1500 ~ "p86",
-          
-          # Class 155-156: Adult Status 4, 2500NM
+          # Class 145-146: Adult Status 4, 2500NM
           candidate_age_category == "adult" & uscrs_status_numeric == 4 & 
-           blood_compatibility == "primary" & PTR_DISTANCE <= 2500 ~ "p87",
+           blood_compatibility == "primary" & PTR_DISTANCE <= 2500 ~ "p79",
           candidate_age_category == "adult" & uscrs_status_numeric == 4 & 
-           blood_compatibility == "secondary" & PTR_DISTANCE <= 2500 ~ "p88",
+           blood_compatibility == "secondary" & PTR_DISTANCE <= 2500 ~ "p80",
           
-          # Class 157-158: Adult Status 5, 2500NM
+          # Class 145-146: Adult Status 5, 2500NM
           candidate_age_category == "adult" & uscrs_status_numeric == 5 & 
-           blood_compatibility == "primary" & PTR_DISTANCE <= 2500 ~ "p89",
+           blood_compatibility == "primary" & PTR_DISTANCE <= 2500 ~ "p81",
           candidate_age_category == "adult" & uscrs_status_numeric == 5 & 
-           blood_compatibility == "secondary" & PTR_DISTANCE <= 2500 ~ "p90",
+           blood_compatibility == "secondary" & PTR_DISTANCE <= 2500 ~ "p82",
           
-          # Class 159-160: Ped 2, 2500NM (pediatric priority)
+          # Class 133-134: Ped 2, 2500NM (pediatric priority)
           candidate_age_category == "pediatric" & pediatric_status == "2" & 
-           blood_compatibility == "primary" & PTR_DISTANCE <= 2500 ~ "p91",
+           blood_compatibility == "primary" & PTR_DISTANCE <= 2500 ~ "p83",
           candidate_age_category == "pediatric" & pediatric_status == "2" & 
-           blood_compatibility == "secondary" & PTR_DISTANCE <= 2500 ~ "p92",
+           blood_compatibility == "secondary" & PTR_DISTANCE <= 2500 ~ "p84",
           
-          # Class 161-162: Adult Status 6, 2500NM (after pediatric 2)
+          # Class 135-136: Adult Status 6, 2500NM
           candidate_age_category == "adult" & uscrs_status_numeric == 6 & 
-           blood_compatibility == "primary" & PTR_DISTANCE <= 2500 ~ "p93",
+           blood_compatibility == "primary" & PTR_DISTANCE <= 2500 ~ "p85",
           candidate_age_category == "adult" & uscrs_status_numeric == 6 & 
-           blood_compatibility == "secondary" & PTR_DISTANCE <= 2500 ~ "p94",
+           blood_compatibility == "secondary" & PTR_DISTANCE <= 2500 ~ "p86",
+          
+          # Class 159-160: Ped 1A, Nation (pediatric priority)
+          candidate_age_category == "pediatric" & pediatric_status == "1A" & 
+           blood_compatibility == "primary"  ~ "p87",
+          candidate_age_category == "pediatric" & pediatric_status == "1A" & 
+           blood_compatibility == "secondary" ~ "p89",
+          
+          # Class 155-156: Adult Status 1, Nation
+          candidate_age_category == "adult" & uscrs_status_numeric == 1 & 
+           blood_compatibility == "primary" ~ "p89",
+          candidate_age_category == "adult" & uscrs_status_numeric == 1 & 
+           blood_compatibility == "secondary" ~ "p90",
+          
+          # Class 157-158: Adult Status 2, Nation
+          candidate_age_category == "adult" & uscrs_status_numeric == 2 & 
+           blood_compatibility == "primary" ~ "p91",
+          candidate_age_category == "adult" & uscrs_status_numeric == 2 & 
+           blood_compatibility == "secondary" ~ "p92",
+          
+          # Class 159-160: Ped 1B, Nation (pediatric priority)
+          candidate_age_category == "pediatric" & pediatric_status == "1B" & 
+           blood_compatibility == "primary" ~ "p93",
+          candidate_age_category == "pediatric" & pediatric_status == "1B" & 
+           blood_compatibility == "secondary" ~ "p94",
+          
+          # Class 161-162: Adult Status 3, Nation (after pediatric 2)
+          candidate_age_category == "adult" & uscrs_status_numeric == 3 & 
+           blood_compatibility == "primary" ~ "p95",
+          candidate_age_category == "adult" & uscrs_status_numeric == 3 & 
+           blood_compatibility == "secondary" ~ "p96",
           
           # Class 163-164: Adult Status 4, Nation
           candidate_age_category == "adult" & uscrs_status_numeric == 4 & 
-           blood_compatibility == "primary"  ~ "p95",
+           blood_compatibility == "primary"  ~ "p97",
           candidate_age_category == "adult" & uscrs_status_numeric == 4 & 
-           blood_compatibility == "secondary"  ~ "p96",
+           blood_compatibility == "secondary"  ~ "p98",
           
           # Class 165-166: Adult Status 5, Nation
           candidate_age_category == "adult" & uscrs_status_numeric == 5 & 
-           blood_compatibility == "primary"  ~ "p97",
+           blood_compatibility == "primary"  ~ "p99",
           candidate_age_category == "adult" & uscrs_status_numeric == 5 & 
-           blood_compatibility == "secondary"  ~ "p98",
+           blood_compatibility == "secondary"  ~ "p100",
           
           # Class 167-168: Ped 2, Nation (pediatric priority)
           candidate_age_category == "pediatric" & pediatric_status == "2" & 
-           blood_compatibility == "primary"  ~ "p99",
+           blood_compatibility == "primary"  ~ "p101",
           candidate_age_category == "pediatric" & pediatric_status == "2" & 
-           blood_compatibility == "secondary"  ~ "p100",
+           blood_compatibility == "secondary"  ~ "p102",
           
           # Class 169-170: Adult Status 6, Nation (after pediatric 2)
           candidate_age_category == "adult" & uscrs_status_numeric == 6 & 
-           blood_compatibility == "primary"  ~ "p101",
+           blood_compatibility == "primary"  ~ "p103",
           candidate_age_category == "adult" & uscrs_status_numeric == 6 & 
-           blood_compatibility == "secondary"  ~ "p102",
+           blood_compatibility == "secondary"  ~ "p104",
           TRUE ~ "p999" # Should not reach here if logic is complete
         ),
         
