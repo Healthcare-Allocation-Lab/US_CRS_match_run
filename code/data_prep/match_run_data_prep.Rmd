@@ -28,10 +28,23 @@ donor_deceased_path <- here("data", "donor_deceased.sas7bdat")
 
 ```{r}
 # load in all sas7bdat files in the data folder
-match_run <- read_sas(match_run_path)
-tx_hr <- read_sas(tx_hr_path)
-cand_thor <- read_sas(cand_thor_path)
-donor_deceased <- read_sas(donor_deceased_path)
+match_run <- read_sas("C:/Users/mwhite10/Downloads/ptr_hr_20220101_20221231_pub.sas7bdat")
+tx_hr <- read_sas("C:/Users/mwhite10/Downloads/pubsaf2506/tx_hr.sas7bdat")
+cand_thor <- read_sas("C:/Users/mwhite10/Downloads/pubsaf2506/cand_thor.sas7bdat")
+donor_deceased <- read_sas("C:/Users/mwhite10/Downloads/pubsaf2506/donor_deceased.sas7bdat")
+institution <- read_sas("C:/Users/mwhite10/Downloads/pubsaf2506/institution.sas7bdat")
+institution
+donor_disposition <- read_sas("C:/Users/mwhite10/Downloads/pubsaf2506/donor_disposition.sas7bdat")
+donor_disposition %>% 
+  filter(is.na(DON_TX_CTR_ID))
+don_zips <- read_sas("C:/Users/mwhite10/Downloads/SupplementalData2506/donzip2506.sas7bdat")
+match_run %>%
+  count(MATCH_OPO_CTR_CD)
+
+donor_disposition %>% group_by(DONOR_ID)
+don_zips %>% filter(DON_HOME_ZIP != "")
+
+institution %>% count(CTR_TY)
 ```
 
 
@@ -75,6 +88,7 @@ heart_only_match_run <- match_run %>%
   )
 
 donor_ids <- heart_only_match_run %>% pull(DONOR_ID) %>% unique()
+
 ```
 
 
@@ -117,16 +131,17 @@ print("Data preparation completed - ready for US-CRS mapping")
 ```{r}
 #US-CRS scores for each (PX_ID, MATCH_SUBMIT_DT) or (PX_ID, PTR_STAT_DT)
 
-load(here("data", "us_crs_history.Rdata"))
+load("C:/Users/mwhite10/Downloads/pred_data.RData")
 
 us_crs_data <- pred_data %>%
-  select(PX_ID, current_date, prob_surv_6wk)
+  select(PX_ID, current_date, prob_surv_6wk, durable_LVAD)
 
 us_crs_data %>%
   mutate(year = year(current_date)) %>%
   count(year)
 
 us_crs_data
+
 ```
 
 # create US CRS mapping table 
@@ -157,7 +172,7 @@ us_crs_mapper <- function(patient_id, match_date){
   # Get patient's longitudinal US-CRS scores
   patient_us_crs_scores <- us_crs_data %>%
     filter(PX_ID == patient_id) %>%
-    select(PX_ID, current_date, prob_surv_6wk)
+    select(PX_ID, current_date, prob_surv_6wk, durable_LVAD)
   
   # Return NA if no data for this patient
   if(nrow(patient_us_crs_scores) == 0) {
@@ -182,6 +197,7 @@ us_crs_mapper <- function(patient_id, match_date){
   
   # Extract the probability
   prob_value <- closest_score$prob_surv_6wk
+  lvad_value <- closest_score$durable_LVAD
   
   # Map to US-CRS using the mapping table
   us_crs_score <- mapping_table_2019_2021 %>%
@@ -190,9 +206,9 @@ us_crs_mapper <- function(patient_id, match_date){
   
   # Return both values
   if(length(us_crs_score) > 0) {
-    return(list(us_crs_score = as.numeric(us_crs_score[1]), prob_surv_6wk = prob_value))
+    return(list(us_crs_score = as.numeric(us_crs_score[1]), prob_surv_6wk = prob_value, durable_LVAD = lvad_value))
   } else {
-    return(list(us_crs_score = NA, prob_surv_6wk = prob_value))
+    return(list(us_crs_score = NA, prob_surv_6wk = prob_value, durable_LVAD = lvad_value))
   }
 }
 
@@ -220,7 +236,8 @@ heart_only_match_run_with_uscrs <- heart_only_match_run %>%
   # Extract both values from the list results
   mutate(
     us_crs_score = map_dbl(uscrs_results, ~ .x$us_crs_score %||% NA_real_),
-    prob_surv_6wk = map_dbl(uscrs_results, ~ .x$prob_surv_6wk %||% NA_real_)
+    prob_surv_6wk = map_dbl(uscrs_results, ~ .x$prob_surv_6wk %||% NA_real_),
+    durable_LVAD = map_dbl(uscrs_results, ~ .x$durable_LVAD %||% NA_real_)
   ) %>%
   select(-uscrs_results) # Remove the temporary list column 
 
@@ -228,6 +245,8 @@ heart_only_match_run_with_uscrs <- heart_only_match_run %>%
 plan(sequential)
 
 print("US-CRS mapping completed!")
+
+
 ```
 
 

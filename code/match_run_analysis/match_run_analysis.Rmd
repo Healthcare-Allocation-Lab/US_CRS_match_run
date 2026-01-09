@@ -55,6 +55,7 @@ if(file.exists(acuity_file)) {
 }
 
 print("Ready for comprehensive match run analysis")
+
 ```
 
 # Data Summary and Quality Checks
@@ -181,6 +182,8 @@ if(exists("heart_only_match_run_national") && exists("heart_only_match_run_count
 } else {
   print("Skipping sequence comparison - missing datasets")
 }
+
+
 ```
 
 # INDIVIDUAL MATCH RUN ANALYSIS
@@ -292,6 +295,7 @@ visualize_match_run <- function(match_id,
 # Visualize a specific match run with US-CRS scores
 sample_match_id <- heart_only_match_run_counterfactual$MATCH_ID[5]  
 
+sample_match_id <- 1418339
 visualize_match_run(sample_match_id, policy = "current", show_us_crs = FALSE)
 
 ggsave(here("results", "status_quo_example.pdf"))
@@ -316,6 +320,7 @@ visualize_match_run(sample_match_id, policy = "national-us-crs",
 
 ggsave(here("results", "national_uscrs_example.pdf"))
 ```
+
 ```{r}
 visualize_match_run(sample_match_id, policy = "national-us-crs", 
                     show_us_crs = TRUE) + lims(x = c(0, 100))
@@ -335,6 +340,158 @@ visualize_match_run(sample_match_id, policy = "acuity-us-crs",
 
 ggsave(here("results", "acuity_uscrs_example_first_100.pdf"))
 ```
+
+```{r}
+sequence_comparison = sequence_comparison %>%
+  mutate(
+    durable_LVAD = ifelse(is.na(durable_LVAD), 0, durable_LVAD),
+    durable_lvad_chr = ifelse(durable_LVAD == 0, "No", "Yes")
+  )
+
+```
+
+
+```{r}
+# Visualize match run for a specific match ID colored by US-CRS score
+visualize_match_run_lvad <- function(match_id, 
+                                policy = "acuity-us-crs",
+                                match_data = sequence_comparison,
+                                    show_us_crs = TRUE,
+                                    sequence_limit = 300) {
+  
+  # Get match run information
+  match_info <- match_data %>%
+    filter(MATCH_ID == match_id) %>%
+    select(DONOR_ID, DON_ABO, MATCH_SUBMIT_DT) %>%
+    distinct()
+  
+  if(nrow(match_info) == 0) {
+    stop("Match ID not found in dataset")
+  }
+  
+  donor_id <- match_info$DONOR_ID
+  donor_blood_type <- match_info$DON_ABO
+  match_date <- match_info$MATCH_SUBMIT_DT
+  
+
+  # Get recipient distance for the rectangle
+  recipient_distance <- match_data %>%
+    filter(is.na(REC_TX_DT) == FALSE & MATCH_ID == match_id) %>%
+    pull(PTR_DISTANCE)
+  
+
+  
+  
+  if (policy == "current"){
+    match_data <- match_data %>%
+      mutate(sequence = current_sequence)
+  } else if (policy == "national-us-crs"){
+    match_data <- match_data %>%
+      mutate(sequence = national_sequence)
+  } else if (policy == "acuity-us-crs"){
+    match_data <- match_data %>%
+      mutate(sequence = acuity_sequence)
+  } else {
+    stop("Invalid policy specified. Use 'current', 
+         'national-us-crs', or 'acuity-us-crs'.")
+  }
+  
+    # Get the actual recipient sequence number as numeric value
+  tx_seq_number <- match_data %>%
+    filter(is.na(REC_TX_DT) == FALSE & MATCH_ID == match_id) %>%
+    pull(sequence)
+  
+  original_tx_seq_number <- match_data %>%
+    filter(is.na(REC_TX_DT) == FALSE & MATCH_ID == match_id) %>%
+    pull(current_sequence)
+  
+    if(length(tx_seq_number) == 0 || is.na(tx_seq_number)) {
+     outcome <- "Not utilized"
+  } else {
+     outcome <- paste("Recipient at sequence:", tx_seq_number, "\nDistance:", recipient_distance, "NM")
+  }
+  
+  # Greyscale for US-CRS, ordered colors for status urgency
+    if (show_us_crs){
+      p <- match_data %>% filter(MATCH_ID == match_id) %>%
+        ggplot(aes(x = sequence, y = PTR_DISTANCE, 
+               fill = us_crs_score, color = durable_lvad_chr)) +
+            scale_fill_gradient(low = "white", 
+                                high = "black", na.value = "grey90", 
+                        name = "US-CRS Score")
+    } else{
+      p <- match_data %>% filter(MATCH_ID == match_id) %>%
+        ggplot(aes(x = sequence, y = PTR_DISTANCE, 
+               color = durable_lvad_chr))
+    }
+  
+  p <- p + geom_point(shape = 21, size = 2, alpha = 0.8, stroke = 1) + 
+    labs(x = "Sequence Number", y = "Distance (NM)", 
+         fill = "US-CRS Score", color = "Durable LVAD", linetype = "Recipient", shape = "Candidate blood type") +
+    ggtitle(paste0("Match ID: ", match_id, " | Donor: ", donor_id, " (", donor_blood_type, ") | ", outcome)) +
+    theme_minimal()
+    
+
+  # Add vertical line and rectangle only if there was a transplant
+  if(length(tx_seq_number) > 0 && !is.na(tx_seq_number)) {
+    p <- p + 
+      geom_rect(
+        xmin = tx_seq_number - 2,
+        xmax = tx_seq_number + 2,
+        ymin = recipient_distance - 25,
+        ymax = recipient_distance + 25,
+        fill = NA,
+        color = "red",
+        linewidth = 1
+      ) + 
+      scale_linetype_manual(values = "dashed")
+  }
+  
+  return(p)
+}
+
+sequence_comparison %>% select(durable_lvad_chr, durable_LVAD)
+
+```
+
+```{r }
+
+
+# Visualize a specific match run with US-CRS scores
+sample_match_id <- heart_only_match_run_counterfactual$MATCH_ID[2]  
+sample_match_id
+sample_match_id <- 1440203
+visualize_match_run_lvad(sample_match_id, policy = "current", show_us_crs = FALSE)
+
+sequence_comparison %>% filter(MATCH_ID == 1418339)
+
+heart_only_match_run_with_uscrs %>% count(durable_LVAD)
+
+sequence_comparison %>% 
+  group_by(MATCH_ID) %>%
+  count(durable_LVAD) %>% 
+  filter(durable_LVAD == 1 & n/sum(n) < 0.4 & any(durable_LVAD == 0))
+
+sequence_comparison %>% filter(MATCH_ID == 1440203		) %>%
+  count(durable_LVAD)
+
+ggsave(here("results", "current_6_status_lvad.pdf"), width = 9, height = 7)
+
+
+```
+```{r}
+visualize_match_run_lvad(sample_match_id, policy = "national-us-crs", show_us_crs = FALSE)
+ggsave(here("results", "national_uscrs_lvad.pdf"), width = 9, height = 7)
+```
+
+```{r}
+visualize_match_run_lvad(sample_match_id, policy = "acuity-us-crs", show_us_crs = FALSE)
+ggsave(here("results", "acuity_uscrs_lvad.pdf"), width = 9, height = 7)
+
+
+```
+
+
 
 ## Sequence shift plot
 
@@ -478,7 +635,7 @@ if(exists("sequence_comparison")) {
 }
 
 
-ggsave(here("results", "us_crs_score_by_position.pdf"))
+ggsave(here("results", "us_crs_score_by_position.png"))
 ```
 
 # Current status distribution for all allocation policies
@@ -585,6 +742,110 @@ if(exists("sequence_comparison")) {
 
 
 ggsave(here("results", "status_distribution_fallback.pdf"))
+```
+# Current status distribution for all allocation policies
+```{r status-distribution-all-systems}
+if(exists("sequence_comparison")) {
+  
+  # Create comprehensive lvad distribution visualization
+  lvad_distribution_data <- sequence_comparison %>%
+    filter(!is.na(current_sequence) & !is.na(national_sequence) & !is.na(acuity_sequence)) %>%
+    pivot_longer(
+      cols = c(current_sequence, national_sequence, acuity_sequence),
+      names_to = "allocation_system",
+      values_to = "sequence_position"
+    ) %>%
+    mutate(
+      allocation_system = case_when(
+        allocation_system == "current_sequence" ~ "Current 6-Status",
+        allocation_system == "national_sequence" ~ "National US-CRS", 
+        allocation_system == "acuity_sequence" ~ "Acuity Circle US-CRS"
+      ),
+      allocation_system = factor(allocation_system, 
+                                levels = c("Current 6-Status", "National US-CRS", "Acuity Circle US-CRS"))
+    ) %>%
+    filter(sequence_position <= 100) %>%  # Focus on top 100 candidates for clarity
+    group_by(allocation_system, sequence_position, durable_lvad_chr) %>%
+    summarise(
+      n_candidates = n(),
+      .groups = "drop"
+    )
+  
+  p_lvad_dist <- lvad_distribution_data %>%
+    ggplot(aes(x = sequence_position, y = n_candidates, fill = durable_lvad_chr)) +
+    geom_area(position = "fill", alpha = 0.8) +
+    facet_wrap(~allocation_system, ncol = 1) +
+    scale_fill_viridis_d(option = "turbo", direction = -1, 
+                      name = "Durable LVAD") +
+    scale_y_continuous(labels = scales::percent_format()) +
+    labs(
+      title = "Candidate lvad Distribution Across All Allocation Systems",
+      x = "Sequence Position (Lower = Higher Priority)",
+      y = "Proportion of Candidates"
+    ) +
+    theme_minimal() +
+    theme(
+      plot.title = element_text(size = 14, face = "bold"),
+      plot.subtitle = element_text(size = 11, color = "gray40"),
+      strip.text = element_text(face = "bold", size = 11),
+      legend.position = "right"
+    )
+  
+  print(p_lvad_dist)
+  
+  # Save the comprehensive lvad distribution plot
+  ggsave(here("results", "lvad_distribution_all_systems.png"), p_lvad_dist, 
+         width = 14, height = 12, dpi = 300)
+  
+  # Summary statistics for lvad distribution
+  lvad_dist_summary <- lvad_distribution_data %>%
+    group_by(allocation_system, durable_lvad_chr) %>%
+    summarise(
+      total_in_top100 = sum(n_candidates),
+      avg_position = round(weighted.mean(sequence_position, n_candidates), 1),
+      .groups = "drop"
+    ) %>%
+    arrange(allocation_system, avg_position)
+  
+  print("Status Distribution Summary (Top 100 positions):")
+  print(lvad_dist_summary)
+  
+} else {
+  # Fallback to two-system comparison if sequence_comparison doesn't exist
+  print("Using fallback two-system comparison...")
+  
+  heart_only_match_run_national %>%
+    select(PX_ID, MATCH_ID, PTR_SEQUENCE_NUM, us_crs_score, national_uscrs_sequence, durable_lvad_chr) %>%
+    rename(current_sequence = PTR_SEQUENCE_NUM) %>%
+    pivot_longer(cols = c(current_sequence, national_uscrs_sequence), 
+                 names_to = "allocation_system", 
+                 values_to = "sequence_position") %>%
+    mutate(
+      allocation_system = case_when(
+        allocation_system == "current_sequence" ~ "Current 6-Status System",
+        allocation_system == "national_uscrs_sequence" ~ "National US-CRS System"
+      ),
+      allocation_system = factor(allocation_system, levels = c("Current 6-Status System", "National US-CRS System"))) %>%
+    group_by(allocation_system, sequence_position, status) %>%
+    filter(sequence_position <= 100) %>%  # Focus on top 100 candidates for clarity
+    summarise(
+      n_candidates = n(),
+      .groups = "drop"
+    ) %>%
+    ggplot(aes(x = sequence_position, y = n_candidates, fill = status)) +
+    geom_area(position = "fill", alpha = 0.8) +
+    facet_wrap(~allocation_system, ncol = 1) +
+    scale_fill_manual(values = status_color_palette) +
+    scale_y_continuous(labels = scales::percent_format()) +
+    labs(
+      title = "Candidate Status Distribution by Allocation System",
+      x = "Sequence Position (Lower = Higher Priority)",
+      y = "Proportion of Candidates"
+    ) + theme_minimal()
+}
+
+
+ggsave(here("results", "lvad_distribution_fallback.pdf"))
 ```
 
 ## Distance by sequence analysis
